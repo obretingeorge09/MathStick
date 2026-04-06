@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "635048943585",
+    "firebase_url": "https://plusminus-46df9-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "plusminus-46df9",
+    "storage_bucket": "plusminus-46df9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:635048943585:android:e9b5d504dd35a06171bca0",
+        "android_client_info": {
+          "package_name": "com.JOC.PlusMinus"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDPohsaHzhLPcvdP3zS-qjzziTusgm4MEE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
