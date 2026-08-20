@@ -27,13 +27,15 @@ public class TimerManager : MonoBehaviour
         }
 
         // Training is where the player LEARNS the puzzle, so it gets real room.
-        // The old 30/60/90 was tuned before Medium grew to three digits and Hard
-        // to three numbers with two operators, and it had not been revisited.
+        // The original 30/60/90 predated Medium growing to three digits and Hard
+        // to three numbers with two operators. Doubled again after play-testing:
+        // reading a seven-segment puzzle is slow work, and a clock that runs out
+        // mid-thought teaches nothing.
         switch (GameManager.Instance.currentMode)
         {
-            case GameMode.Easy:   return 50f;
-            case GameMode.Medium: return 100f;
-            case GameMode.Hard:   return 160f;
+            case GameMode.Easy:   return 100f;
+            case GameMode.Medium: return 200f;
+            case GameMode.Hard:   return 320f;
             default:              return StartTime;
         }
     }

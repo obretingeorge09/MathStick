@@ -1,0 +1,14 @@
+<!--
+  IL2CPP strips code it cannot see being called, and Firebase reaches a lot of
+  its own types through reflection and native callbacks. Without this the build
+  succeeds and then throws at runtime on a device, which is a miserable way to
+  find out. Required now that the Android backend is IL2CPP.
+-->
+<linker>
+  <assembly fullname="Firebase.App" preserve="all"/>
+  <assembly fullname="Firebase.Auth" preserve="all"/>
+  <assembly fullname="Firebase.Database" preserve="all"/>
+  <assembly fullname="Firebase.Platform" preserve="all"/>
+  <assembly fullname="Firebase.TaskExtension" preserve="all"/>
+  <assembly fullname="Google.MiniJson" preserve="all"/>
+</linker>

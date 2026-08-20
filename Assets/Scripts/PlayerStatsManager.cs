@@ -17,11 +17,14 @@ public class PlayerStatsManager : MonoBehaviour
     public const int START_ELO = 1000;
 
     /// <summary>
-    /// Opening balance for a brand-new account. Without it a first-time player
-    /// hits the entry fee with zero coins and is bounced into the top-up sheet
-    /// before ever seeing a match — the worst possible first thirty seconds.
-    /// 100 buys roughly a dozen matches, which is well past the point where the
-    /// first daily bonus lands.
+    /// Opening balance, paid when the player FINISHES their first match rather
+    /// than when the account appears.
+    ///
+    /// Granting it on creation made a throwaway anonymous account worth 100
+    /// coins on sight — more than a rewarded ad pays — so reinstalling beat
+    /// watching an ad. Nobody is stranded meanwhile: the new-player shield
+    /// makes the first 25 ranked matches free, and the day-one login bonus
+    /// lands regardless.
     /// </summary>
     public const int START_COINS = 100;
 
@@ -279,10 +282,9 @@ public class PlayerStatsManager : MonoBehaviour
                     return;
                 }
 
-                bool existing = t.Result != null && t.Result.Exists;
-
-                if (existing) ReadFrom(t.Result);
-                else          Coins = START_COINS;   // genuinely a first run
+                // A new account starts empty; START_COINS is paid on the first
+                // finished match instead (see ApplyResult).
+                if (t.Result != null && t.Result.Exists) ReadFrom(t.Result);
 
                 IsLoaded = true;
                 OnStatsChanged?.Invoke();
@@ -420,6 +422,10 @@ public class PlayerStatsManager : MonoBehaviour
         // Coins are where difficulty actually pays: no ladder to distort, and
         // the player can see the number before choosing the mode.
         if (won) Coins += WinCoins(mode);
+
+        // Matches is monotonic and server-validated, so this fires exactly once
+        // in the lifetime of an account.
+        if (Matches == 1) Coins += START_COINS;
 
         Save();
         OnStatsChanged?.Invoke();

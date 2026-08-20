@@ -64,6 +64,11 @@ public class GameManager : MonoBehaviour
 
     void Awake()
     {
+        // Nothing here animates faster than the eye. On a 120 Hz panel the
+        // default would render twice as many frames as the game needs and
+        // halve battery life for no visible gain.
+        Application.targetFrameRate = 60;
+
         if (Instance == null) Instance = this;
         Messenger.AddListener(Message.CheckForSolution, CheckAnswer);
         Messenger.AddListener(Message.StartNewGame, StartNewGame);

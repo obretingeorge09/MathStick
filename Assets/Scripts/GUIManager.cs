@@ -182,11 +182,27 @@ public class GUIManager : MonoBehaviour
 
     void OnSetTimer(float timer)
     {
-        int seconds      = (int)timer % 100;
-        int milliseconds = (int)((timer - (int)timer) * 100f);
-        string sec = seconds      < 10 ? "0" + seconds      : seconds.ToString();
-        string ms  = milliseconds < 10 ? "0" + milliseconds : milliseconds.ToString();
-        if (lbl_timer != null) lbl_timer.text = sec + ":" + ms;
+        // Above a minute show M:SS; below it, SS:CC. The old format was
+        // seconds % 100, which wrapped: a 100-second training round opened
+        // reading "00:00" and a 320-second one read "20".
+        // Hundredths only earn their place when time is nearly out.
+        if (lbl_timer != null)
+        {
+            int whole = Mathf.Max(0, Mathf.FloorToInt(timer));
+
+            if (timer >= 60f)
+            {
+                int mins = whole / 60;
+                int secs = whole % 60;
+                lbl_timer.text = mins + ":" + (secs < 10 ? "0" + secs : secs.ToString());
+            }
+            else
+            {
+                int hundredths = Mathf.Clamp((int)((timer - whole) * 100f), 0, 99);
+                lbl_timer.text = (whole < 10 ? "0" + whole : whole.ToString())
+                               + ":" + (hundredths < 10 ? "0" + hundredths : hundredths.ToString());
+            }
+        }
 
         // Max 0 means "no limit" — 1v1 rounds are a race with no clock running
         // out, so the bar goes away and the readout stays a neutral colour

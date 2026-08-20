@@ -160,6 +160,11 @@ public class FirebaseDBManager : MonoBehaviour
 
     void OnApplicationPause(bool paused)
     {
+        // A fullscreen ad pauses the app without the player going anywhere.
+        // Dropping presence here would let the opponent's disconnect grace
+        // period forfeit a live match while an ad is on screen.
+        if (AdManager.Instance != null && AdManager.Instance.IsShowing) return;
+
         if (paused)
             GoOffline();
         else
