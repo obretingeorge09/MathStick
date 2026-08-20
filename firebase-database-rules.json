@@ -1,0 +1,145 @@
+{
+  "rules": {
+
+    "users": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid == $uid",
+        "displayName": { ".validate": "newData.isString() && newData.val().length <= 32" },
+        "online":      { ".validate": "newData.isBoolean()" },
+        "lastSeen":    { ".validate": "newData.isNumber()" },
+        "$other":      { ".validate": false }
+      }
+    },
+
+    "presence": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid == $uid",
+        ".validate": "newData.isBoolean()"
+      }
+    },
+
+    "matchmaking": {
+      ".read": "auth != null",
+      "$uid": {
+        "//": "Anyone authenticated may DELETE an entry, because claiming a match runs a transaction that clears BOTH players from the queue. Only the owner may create or change one, so entries cannot be forged.",
+        ".write": "auth != null && (auth.uid == $uid || !newData.exists())",
+        "displayName": { ".validate": "newData.isString() && newData.val().length <= 32" },
+        "timestamp":   { ".validate": "newData.isNumber()" },
+        "mode":        { ".validate": "newData.isString() && newData.val().length <= 16" },
+        "firstTo":     { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 15" },
+        "$other":      { ".validate": false }
+      }
+    },
+
+    "matches": {
+      ".read": "auth != null",
+      "$matchId": {
+        "//": "Creation is open, but once a match exists only its two players may touch it. This is what stops a third party rewriting scores or declaring a winner.",
+        ".write": "auth != null && (!data.exists() || data.child('players').hasChild(auth.uid))"
+      }
+    },
+
+    "invites": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        "//": "The sender writes into the recipient's inbox, so writes cannot be owner-scoped here.",
+        ".write": "auth != null",
+        "$inviteId": {
+          "fromUid":  { ".validate": "newData.isString()" },
+          "fromName": { ".validate": "newData.isString() && newData.val().length <= 32" },
+          "status":   { ".validate": "newData.isString() && newData.val().length <= 16" }
+        }
+      }
+    },
+
+    "friends": {
+      "$uid": {
+        ".read": "auth != null",
+        "//": "Adding a friend writes both directions, so the target's list must accept a write from the other party.",
+        ".write": "auth != null",
+        "$friendId": { ".validate": "newData.isString() && newData.val().length <= 32" }
+      }
+    },
+
+    "stats": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid == $uid",
+
+        "//": "Ownership alone is not enough: the client writes this node directly, so one authenticated curl could set coins to a billion and plant a fake Master at the top of a public leaderboard. Absolute ceilings kill the visible cheat; per-write deltas bound the invisible one.",
+
+        "elo": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2500 && (!data.exists() || (newData.val() - data.val() <= 60 && data.val() - newData.val() <= 60))"
+        },
+        "coins": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000 && (!data.exists() || newData.val() - data.val() <= 300)"
+        },
+
+        "//monotonic": "Career counters only ever go up, and you cannot have won more matches than you played.",
+        "matches":   { ".validate": "newData.isNumber() && newData.val() >= 0 && (!data.exists() || newData.val() >= data.val())" },
+        "wins":      { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('matches').val()" },
+        "losses":    { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('matches').val()" },
+        "roundsWon":  { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "roundsLost": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+
+        "currentStreak": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000" },
+        "bestStreak":    { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000" },
+
+        "displayName": { ".validate": "newData.isString() && newData.val().length <= 32" },
+        "country":     { ".validate": "newData.isString() && newData.val().length == 2" },
+        "updatedAt":   { ".validate": "newData.isNumber()" },
+        "$other":      { ".validate": false }
+      }
+    },
+
+    "daily": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid",
+
+        "streak":        { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000" },
+        "longestStreak": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000" },
+
+        "//dates": "Stored as yyyy-MM-dd and produced from the SERVER clock, so moving the phone's date forward does not advance a streak.",
+        "lastLoginDate":     { ".validate": "newData.isString() && newData.val().length <= 10" },
+        "streakClaimedDate": { ".validate": "newData.isString() && newData.val().length <= 10" },
+        "challengeDate":     { ".validate": "newData.isString() && newData.val().length <= 10" }
+      }
+    },
+
+    "leaderboard": {
+      ".read": "auth != null",
+      "global": {
+        "$month": {
+          ".indexOn": "elo",
+          "$uid": {
+            ".write": "auth != null && auth.uid == $uid",
+            "name":    { ".validate": "newData.isString() && newData.val().length <= 32" },
+            "elo":     { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2500" },
+            "wins":    { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "country": { ".validate": "newData.isString() && newData.val().length == 2" },
+            "$other":  { ".validate": false }
+          }
+        }
+      },
+      "country": {
+        "$cc": {
+          "$month": {
+            ".indexOn": "elo",
+            "$uid": {
+              ".write": "auth != null && auth.uid == $uid",
+              "name":    { ".validate": "newData.isString() && newData.val().length <= 32" },
+              "elo":     { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2500" },
+              "wins":    { ".validate": "newData.isNumber() && newData.val() >= 0" },
+              "country": { ".validate": "newData.isString() && newData.val().length == 2" },
+              "$other":  { ".validate": false }
+            }
+          }
+        }
+      }
+    }
+
+  }
+}
