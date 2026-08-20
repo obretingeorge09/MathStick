@@ -32,9 +32,13 @@ crashlytics-build.properties
 # Unity sample project that landed here by accident (2.3 GB, unrelated to the game)
 /Setup Guide In-Editor Tutorial/
 
-# Firebase DESKTOP binaries — 339 MB, and two of them exceed GitHub's 100 MB
-# per-file limit. They only matter for Play mode in the Editor; the Android
-# build uses Assets/Plugins/Android instead. Restore them by re-importing the
-# Firebase Unity SDK.
-/Assets/Firebase/Plugins/x86_64/
-/Assets/Firebase/Plugins/x86/
+# Firebase desktop binaries for platforms this project does not develop on.
+# The macOS .bundle (191 MB) and Linux .so (123 MB) both blow past GitHub's
+# 100 MB per-file limit. The Windows .dll files stay in the repo: they are
+# only 23 MB in total and they are what the Editor actually loads here, so a
+# fresh clone still runs Firebase in Play mode.
+# The Android build uses Assets/Plugins/Android and is unaffected either way.
+/Assets/Firebase/Plugins/x86_64/*.bundle
+/Assets/Firebase/Plugins/x86_64/*.bundle.meta
+/Assets/Firebase/Plugins/x86_64/*.so
+/Assets/Firebase/Plugins/x86_64/*.so.meta
