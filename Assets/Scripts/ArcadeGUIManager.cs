@@ -394,14 +394,17 @@ public class ArcadeGUIManager : MonoBehaviour
         GameMode feeMode = selectedMode == GameMode.Random ? GameMode.Medium : selectedMode;
         int fee = PlayerStatsManager.EntryFee(feeMode);
 
-        if (!stats.TrySpendCoins(fee))
-        {
-            ShowNoCoins(fee, stats.Coins);
-            return false;
-        }
+        // A newcomer must never be priced out before they know the game
+        if (stats.HasNewPlayerShield) { pendingFee = 0; return true; }
 
-        pendingFee = fee;
-        return true;
+        if (stats.TrySpendCoins(fee)) { pendingFee = fee; return true; }
+
+        // Broke: the day's free entries are what make "you can always play"
+        // true for ranked as well, not only for training
+        if (stats.TryUseFreeEntry()) { pendingFee = 0; return true; }
+
+        ShowNoCoins(fee, stats.Coins);
+        return false;
     }
 
     /// <summary>Give the fee back — the player never reached a match.</summary>
@@ -419,7 +422,14 @@ public class ArcadeGUIManager : MonoBehaviour
         Show(pnl_noCoins, true);
 
         if (lbl_noCoins_detail != null)
-            lbl_noCoins_detail.text = "NEED " + needed + "  ·  YOU HAVE " + have;
+        {
+            int free = PlayerStatsManager.Instance != null
+                ? PlayerStatsManager.Instance.FreeEntriesRemaining : 0;
+
+            lbl_noCoins_detail.text = free > 0
+                ? "NEED " + needed + "  ·  YOU HAVE " + have + "  ·  " + free + " FREE LEFT"
+                : "NEED " + needed + "  ·  YOU HAVE " + have;
+        }
 
         // The ad is an accelerator, never the only door. TRAINING is free and
         // the daily bonus lands tomorrow regardless, so this sheet always has
@@ -431,7 +441,11 @@ public class ArcadeGUIManager : MonoBehaviour
             lbl_watchAd.text = "WATCH AD  +" + AD_REWARD;
     }
 
-    public const int AD_REWARD = 50;
+    /// <summary>
+    /// Deliberately below the 50-coin day-1 login bonus. An ad that pays more
+    /// than showing up teaches the player to skip the daily hook.
+    /// </summary>
+    public const int AD_REWARD = 30;
 
     public void OnWatchAdPressed()
     {
@@ -821,6 +835,9 @@ public class ArcadeGUIManager : MonoBehaviour
 
     void ShowError(string msg)
     {
+        // Whatever went wrong, the player never reached a match — give it back
+        RefundEntry();
+
         Debug.LogError("Arcade: " + msg);
         if (lbl_waitingStatus != null && pnl_arcadeWaiting.activeSelf)
             lbl_waitingStatus.text = "ERROR: " + msg;

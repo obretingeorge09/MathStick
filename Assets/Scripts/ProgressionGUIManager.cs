@@ -55,6 +55,7 @@ public class ProgressionGUIManager : MonoBehaviour
     // ── Start-screen badges ─────────────────────────────────────────────
     public Text       lbl_menu_rank  = null;
     public Text       lbl_menu_coins = null;
+    public Text       lbl_arcade_coins = null;  // same balance, on the screen that charges
     public GameObject badge_daily    = null;   // dot shown when rewards are waiting
 
     LeaderboardScope currentScope = LeaderboardScope.Global;
@@ -120,6 +121,8 @@ public class ProgressionGUIManager : MonoBehaviour
             }
             if (lbl_menu_coins != null)
                 lbl_menu_coins.text = stats.Coins.ToString();
+            if (lbl_arcade_coins != null)
+                lbl_arcade_coins.text = stats.Coins.ToString();
         }
 
         var daily = DailyManager.Instance;

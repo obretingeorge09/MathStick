@@ -807,17 +807,17 @@ public static class SceneBuilder
 
         var abEasy = SegButton(amt, "btn_arc_easy", "EASY", V2(.5f,1), V2(.5f,1), V2(0,-230),
             V2(380, 80), 28, mGreen2);
-        DigTxt(amt, "lbl_easy_info", "2 DIGITS  ·  RANK x0.75  ·  10 COINS",
+        DigTxt(amt, "lbl_easy_info", "2 DIGITS  ·  PLAY 3  ·  WIN 10  ·  RANK x0.75",
             V2(.5f,1), V2(.5f,1), V2(0,-292), V2(560,22), 14, TEXT_MUTED).raycastTarget = false;
 
         var abMed = SegButton(amt, "btn_arc_medium", "MEDIUM", V2(.5f,1), V2(.5f,1), V2(0,-370),
             V2(380, 80), 28, mYellow2);
-        DigTxt(amt, "lbl_med_info", "3 DIGITS  ·  RANK x1.0  ·  18 COINS",
+        DigTxt(amt, "lbl_med_info", "3 DIGITS  ·  PLAY 5  ·  WIN 18  ·  RANK x1.0",
             V2(.5f,1), V2(.5f,1), V2(0,-432), V2(560,22), 14, TEXT_MUTED).raycastTarget = false;
 
         var abHard = SegButton(amt, "btn_arc_hard", "HARD", V2(.5f,1), V2(.5f,1), V2(0,-510),
             V2(380, 80), 28, mRed2);
-        DigTxt(amt, "lbl_hard_info", "3 NUMBERS  ·  RANK x1.25  ·  30 COINS",
+        DigTxt(amt, "lbl_hard_info", "3 NUMBERS  ·  PLAY 9  ·  WIN 30  ·  RANK x1.25",
             V2(.5f,1), V2(.5f,1), V2(0,-572), V2(560,22), 14, TEXT_MUTED).raycastTarget = false;
 
         var abRand = SegButton(amt, "btn_arc_random", "RANDOM", V2(.5f,1), V2(.5f,1), V2(0,-650),
@@ -842,6 +842,16 @@ public static class SceneBuilder
             V2(420, 80), 26, arcDim);
 
         // Back
+        // Same coin readout as the DAILY panel, so the fee is never a surprise
+        var arcCoinDot = Img(amt, "img_arc_coin", V2(1,1), V2(1,1), V2(-215,-72), V2(22,22), Hex("#FFD600"));
+        arcCoinDot.sprite = Circle;
+        arcCoinDot.raycastTarget = false;
+
+        var lblArcCoins = Txt(amt, "lbl_arc_coins", "0",
+            V2(1,1), V2(1,1), V2(-110,-72), V2(180,40), 22, Hex("#FFD600"),
+            TextAnchor.MiddleLeft, FontStyle.Bold);
+        lblArcCoins.raycastTarget = false;
+
         var abBack = BackArrowButton(amt, "btn_arc_back", V2(0,1), V2(0,1), V2(70, -70), 80, arcDim);
 
         pnlArcMode.SetActive(false);
@@ -1167,7 +1177,7 @@ public static class SceneBuilder
             TextAnchor.MiddleCenter, FontStyle.Normal);
         lblNcDetail.raycastTarget = false;
 
-        var ncAd = SegButton(ncc, "btn_watch_ad", "WATCH AD  +50", V2(.5f,1), V2(.5f,1), V2(0,-250),
+        var ncAd = SegButton(ncc, "btn_watch_ad", "WATCH AD  +30", V2(.5f,1), V2(.5f,1), V2(0,-250),
             V2(580, 110), 28, Hex("#FFD600"));
         var ncTrain = SegButton(ncc, "btn_play_training", "PLAY TRAINING  ·  FREE", V2(.5f,1), V2(.5f,1), V2(0,-380),
             V2(580, 96), 24, ACCENT);
@@ -1342,6 +1352,7 @@ public static class SceneBuilder
 
         prog.lbl_menu_rank  = lblMenuRank;
         prog.lbl_menu_coins = lblMenuCoins;
+        prog.lbl_arcade_coins = lblArcCoins;
         prog.badge_daily    = dailyBadge.gameObject;
 
         var card = pnlCont.transform.Find("Card");
