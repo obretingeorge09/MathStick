@@ -13,6 +13,8 @@ dependencies {
     implementation 'com.google.firebase:firebase-database:22.0.1' // Assets/Firebase/Editor/DatabaseDependencies.xml:16
     implementation 'com.google.firebase:firebase-database-unity:13.9.0' // Assets/Firebase/Editor/DatabaseDependencies.xml:25
 // Android Resolver Dependencies End
+    implementation 'com.google.android.gms:play-services-auth:21.0.0' // Google Sign-In
+    implementation 'com.facebook.android:facebook-login:17.0.1' // Facebook Login
 **DEPS**}
 
 // Android Resolver Exclusions Start

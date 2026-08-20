@@ -28,3 +28,6 @@ crashlytics-build.properties
 
 # Asset meta (keep .meta files, they're important in Unity)
 !/[Aa]ssets/**/*.meta
+
+# Unity sample project that landed here by accident (2.3 GB, unrelated to the game)
+/Setup Guide In-Editor Tutorial/

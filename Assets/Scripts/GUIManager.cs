@@ -15,6 +15,7 @@ public class GUIManager : MonoBehaviour
 
     public Text  lbl_gameProgress   = null;  // big streak number
     public Text  lbl_timer          = null;
+    public Text  lbl_timeLabel      = null;  // caption above the clock
     public Text  lbl_highscore      = null;
     public Text  lbl_startHighscore = null;  // highscore on start screen
     public Text  lbl_result         = null;  // "WELL DONE!" / "TIME'S UP!"
@@ -38,10 +39,6 @@ public class GUIManager : MonoBehaviour
     public GameObject pnl_forgotPassword = null;
     public InputField inp_forgot_email   = null;
     public Text lbl_forgot_status        = null;
-    public Text lbl_volume_icon    = null;
-    public GameObject volume_slash  = null;
-    public Image img_volume_on     = null;
-    public GameObject img_volume_muted = null;
 
     Coroutine autoContinueCo = null;
 
@@ -72,18 +69,27 @@ public class GUIManager : MonoBehaviour
 
     void Start()
     {
-        pnl_fader.SetActive(false);
-        pnl_continue.SetActive(false);
-        pnl_main.SetActive(false);
-        pnl_tutorial.SetActive(false);
-        pnl_start.SetActive(false);
-        if (pnl_modeSelect) pnl_modeSelect.SetActive(false);
-        pnl_login.SetActive(false);
-        pnl_register.SetActive(false);
-        if (pnl_forgotPassword) pnl_forgotPassword.SetActive(false);
+        // Every one of these is guarded: this is the very first thing that runs,
+        // and a single unassigned reference here means the app never reaches
+        // InitFirebase and the player stares at a black screen.
+        Show(pnl_fader, false);
+        Show(pnl_continue, false);
+        Show(pnl_main, false);
+        Show(pnl_tutorial, false);
+        Show(pnl_start, false);
+        Show(pnl_modeSelect, false);
+        Show(pnl_login, false);
+        Show(pnl_register, false);
+        Show(pnl_forgotPassword, false);
 
         AuthManager.Instance.InitFirebase(() => {
             UnityMainThreadDispatcher.Enqueue(() => {
+                // Initialize social login bridges after Firebase is ready
+                if (GoogleSignInBridge.Instance != null)
+                    GoogleSignInBridge.Instance.Initialize();
+                if (FacebookSignInBridge.Instance != null)
+                    FacebookSignInBridge.Instance.Initialize();
+
                 if (AuthManager.Instance.IsLoggedIn)
                     ShowStartScreen();
                 else
@@ -128,14 +134,14 @@ public class GUIManager : MonoBehaviour
     public void OnModeBackPressed()
     {
         HideAllPanels();
-        pnl_start?.SetActive(true);
+        Show(pnl_start, true);
     }
 
     public void OnBackToMenuPressed()
     {
         if (autoContinueCo != null) { StopCoroutine(autoContinueCo); autoContinueCo = null; }
         HideAllPanels();
-        pnl_start?.SetActive(true);
+        Show(pnl_start, true);
     }
 
     public void OnArcadePressed()
@@ -152,13 +158,13 @@ public class GUIManager : MonoBehaviour
     public void OnTutorialPressed()
     {
         HideAllPanels();
-        pnl_tutorial.SetActive(true);
+        Show(pnl_tutorial, true);
     }
 
     public void OnTutorialBackPressed()
     {
         HideAllPanels();
-        pnl_start?.SetActive(true);
+        Show(pnl_start, true);
     }
 
     // ── Called by button and auto-continue ─────────────────────────────────
@@ -180,17 +186,34 @@ public class GUIManager : MonoBehaviour
         int milliseconds = (int)((timer - (int)timer) * 100f);
         string sec = seconds      < 10 ? "0" + seconds      : seconds.ToString();
         string ms  = milliseconds < 10 ? "0" + milliseconds : milliseconds.ToString();
-        lbl_timer.text = sec + ":" + ms;
+        if (lbl_timer != null) lbl_timer.text = sec + ":" + ms;
 
-        float ratio = timerMaxTime > 0 ? Mathf.Clamp01(timer / timerMaxTime) : 0f;
+        // Max 0 means "no limit" — 1v1 rounds are a race with no clock running
+        // out, so the bar goes away and the readout stays a neutral colour
+        // rather than turning red as if the player were about to lose.
+        bool unlimited = timerMaxTime <= 0f;
+
+        if (lbl_timeLabel != null)
+        {
+            string caption = unlimited ? "TIME" : "TIME REMAINING";
+            if (lbl_timeLabel.text != caption) lbl_timeLabel.text = caption;
+        }
+
+        float ratio = unlimited ? 1f : Mathf.Clamp01(timer / timerMaxTime);
+        Color tint = unlimited ? ColWarm
+                   : ratio > 0.33f ? ColWarm
+                   : ratio > 0.11f ? ColYellow : ColRed;
 
         if (timerBarFill != null)
         {
+            if (timerBarFill.gameObject.activeSelf == unlimited)
+                timerBarFill.gameObject.SetActive(!unlimited);
+
             timerBarFill.fillAmount = ratio;
-            timerBarFill.color = ratio > 0.33f ? ColWarm : ratio > 0.11f ? ColYellow : ColRed;
+            timerBarFill.color = tint;
         }
-        if (lbl_timer != null)
-            lbl_timer.color = ratio > 0.33f ? ColWarm : ratio > 0.11f ? ColYellow : ColRed;
+
+        if (lbl_timer != null) lbl_timer.color = tint;
     }
 
     // ── Fade-to-opaque finished ────────────────────────────────────────────
@@ -250,6 +273,7 @@ public class GUIManager : MonoBehaviour
         {
             Debug.Log("Activating pnl_main");
             pnl_main.SetActive(true);
+            ApplyBgColor();
         }
     }
 
@@ -296,37 +320,83 @@ public class GUIManager : MonoBehaviour
         if (pnl_continue) pnl_continue.SetActive(false);
         if (pnl_tutorial) pnl_tutorial.SetActive(false);
         if (pnl_forgotPassword) pnl_forgotPassword.SetActive(false);
+        if (pnl_settings) pnl_settings.SetActive(false);
         ArcadeGUIManager.Instance?.HideAllPanels();
+        ProgressionGUIManager.Instance?.HideAll();
     }
+
+    /// <summary>HideAllPanels for other managers that open their own screens.</summary>
+    public void HideAllPanelsPublic() => HideAllPanels();
 
     public void ShowLoginScreen()
     {
         HideAllPanels();
-        pnl_login?.SetActive(true);
+        Show(pnl_login, true);
         if (lbl_login_error) lbl_login_error.text = "";
     }
+
+    bool progressionLoaded = false;
 
     public void ShowStartScreen()
     {
         HideAllPanels();
-        pnl_start?.SetActive(true);
+        Show(pnl_start, true);
+
+        // First time we reach the menu we know Firebase and the user are ready
+        if (!progressionLoaded && AuthManager.Instance != null && AuthManager.Instance.IsLoggedIn)
+        {
+            progressionLoaded = true;
+            PlayerStatsManager.Instance?.Load();
+            DailyManager.Instance?.Load();
+        }
+
+        ProgressionGUIManager.Instance?.RefreshMenuBadges();
+    }
+
+    // ── Progression screens ───────────────────────────────────────────────
+    public void OnProfilePressed()     { ProgressionGUIManager.Instance?.ShowProfile(); }
+    public void OnLeaderboardPressed() { ProgressionGUIManager.Instance?.ShowLeaderboard(); }
+    public void OnDailyPressed()       { ProgressionGUIManager.Instance?.ShowDaily(); }
+
+    static readonly Color FieldNormal = new Color(0.08f, 0.10f, 0.16f, 1f);
+    static readonly Color FieldError  = new Color(0.35f, 0.05f, 0.05f, 1f);
+
+    void HighlightField(InputField field, bool error)
+    {
+        if (field == null) return;
+        var img = field.GetComponent<Image>();
+        if (img) img.color = error ? FieldError : FieldNormal;
+    }
+
+    void ResetFieldColors()
+    {
+        HighlightField(inp_email, false);
+        HighlightField(inp_password, false);
     }
 
     public void OnLoginPressed()
     {
         if (lbl_login_error) lbl_login_error.text = "";
+        ResetFieldColors();
+
         string email = inp_email?.text ?? "";
         string pass  = inp_password?.text ?? "";
 
+        bool hasError = false;
         if (string.IsNullOrEmpty(email)) {
-            if (lbl_login_error) lbl_login_error.text = "Email is required";
-            return;
+            HighlightField(inp_email, true);
+            hasError = true;
         }
         if (string.IsNullOrEmpty(pass)) {
-            if (lbl_login_error) lbl_login_error.text = "Password is required";
+            HighlightField(inp_password, true);
+            hasError = true;
+        }
+        if (hasError) {
+            if (lbl_login_error) lbl_login_error.text = "Please fill in all fields";
             return;
         }
         if (!email.Contains("@")) {
+            HighlightField(inp_email, true);
             if (lbl_login_error) lbl_login_error.text = "Invalid email format";
             return;
         }
@@ -419,7 +489,7 @@ public class GUIManager : MonoBehaviour
     public void OnShowRegisterPressed()
     {
         HideAllPanels();
-        pnl_register?.SetActive(true);
+        Show(pnl_register, true);
         if (lbl_login_error) lbl_login_error.text = "";
     }
 
@@ -470,21 +540,94 @@ public class GUIManager : MonoBehaviour
         ShowLoginScreen();
     }
 
+    // ── Social login ──────────────────────────────────────────────────────
+    public void OnGoogleLoginPressed()
+    {
+        if (lbl_login_error) { lbl_login_error.color = new Color(1f, 0.7f, 0.2f); lbl_login_error.text = ""; }
+        AuthManager.Instance.OnLoginSuccess += OnLoginSuccess;
+        AuthManager.Instance.OnLoginFailed  += OnSocialLoginError;
+        AuthManager.Instance.LoginWithGoogle();
+    }
+
+    public void OnFacebookLoginPressed()
+    {
+        if (lbl_login_error) { lbl_login_error.color = new Color(1f, 0.7f, 0.2f); lbl_login_error.text = ""; }
+        AuthManager.Instance.OnLoginSuccess += OnLoginSuccess;
+        AuthManager.Instance.OnLoginFailed  += OnSocialLoginError;
+        AuthManager.Instance.LoginWithFacebook();
+    }
+
+    void OnSocialLoginError(string msg)
+    {
+        AuthManager.Instance.OnLoginSuccess -= OnLoginSuccess;
+        AuthManager.Instance.OnLoginFailed  -= OnSocialLoginError;
+        UnityMainThreadDispatcher.Enqueue(() => {
+            if (lbl_login_error)
+            {
+                lbl_login_error.color = new Color(1f, 0.7f, 0.2f);
+                lbl_login_error.text = msg;
+            }
+        });
+    }
+
+    // ── Guest Login ────────────────────────────────────────────────────
+    public void OnGuestLoginPressed()
+    {
+        if (lbl_login_error) { lbl_login_error.color = new Color(0.5f, 1f, 0.5f); lbl_login_error.text = "Connecting..."; }
+        AuthManager.Instance.OnLoginSuccess += OnLoginSuccess;
+        AuthManager.Instance.OnLoginFailed  += OnSocialLoginError;
+        AuthManager.Instance.LoginAsGuest();
+    }
+
+    // ── Settings ────────────────────────────────────────────────────────
+    public GameObject pnl_settings = null;
+
+    public void OnSettingsPressed()
+    {
+        HideAllPanels();
+        if (pnl_settings) pnl_settings.SetActive(true);
+    }
+
+    public void OnSettingsBackPressed()
+    {
+        HideAllPanels();
+        Show(pnl_start, true);
+    }
+
+    public Image gameBG = null;
+
+    public void ApplyBgColor()
+    {
+        if (gameBG && GameSettings.Instance != null)
+            gameBG.color = GameSettings.Instance.SelectedBgColor;
+    }
+
+    // Audio is owned by VolumeControl now — it manages the corner key, the
+    // level readout and the stepped popover. These remain so any older wiring
+    // or serialized UnityEvent reference still resolves.
     public void OnVolumePressed()
     {
-        if (AudioManager.Instance != null)
-        {
-            AudioManager.Instance.ToggleMute();
-            UpdateVolumeIcon();
-        }
+        VolumeControl.Instance?.Toggle();
     }
 
     public void UpdateVolumeIcon()
     {
-        if (AudioManager.Instance == null) return;
-        bool muted = AudioManager.Instance.IsMuted;
-        // Show muted overlay, hide normal icon underneath
-        if (img_volume_muted != null)
-            img_volume_muted.SetActive(muted);
+        VolumeControl.Instance?.Redraw();
     }
+
+    /// <summary>
+    /// SetActive that survives an unassigned or destroyed reference.
+    ///
+    /// The null-conditional operator does a RAW reference check and bypasses
+    /// Unity's overloaded ==, so `panel?.SetActive(x)` throws
+    /// UnassignedReferenceException on a field the scene never wired up. That
+    /// is exactly what happens whenever a script gains a new field and the
+    /// scene has not been rebuilt yet — and one throw inside a hide-everything
+    /// sweep takes the whole screen down with it.
+    /// </summary>
+    static void Show(GameObject go, bool on)
+    {
+        if (go != null && go.activeSelf != on) go.SetActive(on);
+    }
+
 }

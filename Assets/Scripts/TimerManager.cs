@@ -26,11 +26,14 @@ public class TimerManager : MonoBehaviour
             }
         }
 
+        // Training is where the player LEARNS the puzzle, so it gets real room.
+        // The old 30/60/90 was tuned before Medium grew to three digits and Hard
+        // to three numbers with two operators, and it had not been revisited.
         switch (GameManager.Instance.currentMode)
         {
-            case GameMode.Easy:   return 30f;
-            case GameMode.Medium: return 60f;
-            case GameMode.Hard:   return 90f;
+            case GameMode.Easy:   return 50f;
+            case GameMode.Medium: return 100f;
+            case GameMode.Hard:   return 160f;
             default:              return StartTime;
         }
     }
@@ -50,6 +53,7 @@ public class TimerManager : MonoBehaviour
         Messenger.AddListener(Message.ArcadeRoundWon, () =>
         {
             StopCoroutine("TimerCo");
+            StopCoroutine("StopwatchCo");
             gameAlreadyWon = true;
             // No timer reduction in arcade mode
         });
@@ -58,9 +62,13 @@ public class TimerManager : MonoBehaviour
             StopCoroutine("TimerCo");
             gameAlreadyWon = true;
             if (GameManager.Instance != null && GameManager.Instance.isArcadeMode) return;
-            float modeMin = GetStartTimeForMode() * 0.5f; // min = half of mode start
+
+            // The streak tightens the clock, but gently: losing 5s per win meant
+            // a good run punished itself into the floor within ten rounds.
+            // 3s per win against a 65% floor keeps a long streak playable.
+            float modeMin = GetStartTimeForMode() * 0.65f;
             if (modeMin < MinTime) modeMin = MinTime;
-            float reduction = currentMaxTime > modeMin + 5f ? 5f : 1f;
+            float reduction = currentMaxTime > modeMin + 3f ? 3f : 1f;
             currentMaxTime = Mathf.Max(currentMaxTime - reduction, modeMin);
         });
         Messenger.AddListener(Message.GameLost, () =>
@@ -90,21 +98,39 @@ public class TimerManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Start the timer for arcade mode rounds (bypasses fade system).
+    /// Arcade rounds run a stopwatch, not a countdown. A max of 0 tells the
+    /// HUD there is no limit, so it drops the progress bar and stops tinting
+    /// the readout red as if the player were running out.
     /// </summary>
     public void StartArcadeTimer()
     {
         StopCoroutine("TimerCo");
-        currentMaxTime = GetStartTimeForMode();
-        currentTimer = currentMaxTime;
-        Messenger.Broadcast<float>(Message.OnSetTimer, currentTimer);
-        Messenger.Broadcast<float>(Message.OnSetTimerMax, currentMaxTime);
-        StartCoroutine("TimerCo");
+        StopCoroutine("StopwatchCo");
+
+        currentTimer = 0f;
+        currentMaxTime = 0f;
+        Messenger.Broadcast<float>(Message.OnSetTimerMax, 0f);
+        Messenger.Broadcast<float>(Message.OnSetTimer, 0f);
+        StartCoroutine("StopwatchCo");
     }
 
     public void StopArcadeTimer()
     {
         StopCoroutine("TimerCo");
+        StopCoroutine("StopwatchCo");
+    }
+
+    IEnumerator StopwatchCo()
+    {
+        currentTimer = 0f;
+        gameAlreadyWon = false;
+
+        while (true)
+        {
+            Messenger.Broadcast<float>(Message.OnSetTimer, currentTimer);
+            currentTimer += Time.deltaTime;
+            yield return null;
+        }
     }
 
     IEnumerator TimerCo()
@@ -126,7 +152,13 @@ public class TimerManager : MonoBehaviour
             Messenger.Broadcast<float>(Message.OnSetTimer, currentTimer);
 
             if (GameManager.Instance != null && GameManager.Instance.isArcadeMode)
-                ArcadeMatchManager.Instance?.OnLocalPlayerTimeout();
+            {
+                // A bot match owns the round when one is running; otherwise it's a real 1v1
+                if (BotMatchManager.Instance != null && BotMatchManager.Instance.IsInMatch)
+                    BotMatchManager.Instance.OnLocalPlayerTimeout();
+                else
+                    ArcadeMatchManager.Instance?.OnLocalPlayerTimeout();
+            }
             else
                 Messenger.Broadcast(Message.GameLost);
         }

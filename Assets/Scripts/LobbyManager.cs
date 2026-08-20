@@ -16,11 +16,22 @@ public class LobbyManager : MonoBehaviour
     public event Action<string> OnError;
     public event Action<string> OnInviteAccepted; // matchId — fires on sender side when invite is accepted
     public event Action OnInviteDeclined;
+    public event Action<GameMode, int> OnBotFallback; // no human found — play a bot instead
+
+    /// <summary>
+    /// How long to look for a human before falling back to a bot opponent.
+    /// Without this the queue dead-ends whenever nobody else is online.
+    /// </summary>
+    public float botFallbackSeconds = 5f;
 
     List<OnlineUser> onlineUsers = new List<OnlineUser>();
+    List<OnlineUser> friendsList = new List<OnlineUser>();
+    HashSet<string> friendUids = new HashSet<string>();
     bool isListeningUsers = false;
     bool isSearchingRandom = false;
     Coroutine matchmakingCo;
+
+    public event Action<List<OnlineUser>> OnFriendsUpdated;
 
     // Current invite being sent (for tracking response)
     string pendingInviteTargetUid;
@@ -102,7 +113,7 @@ public class LobbyManager : MonoBehaviour
             if (task.Result != null && task.Result.Exists)
                 name = task.Result.Value.ToString();
 
-            users.Add(new OnlineUser { uid = uid, displayName = name });
+            users.Add(new OnlineUser { uid = uid, displayName = name, isFriend = friendUids.Contains(uid), isOnline = true });
         }
 
         onlineUsers = users;
@@ -177,12 +188,30 @@ public class LobbyManager : MonoBehaviour
     {
         var db = FirebaseDBManager.Instance;
         string myUid = AuthManager.Instance.CurrentUser.UserId;
+        float searching = 0f;
 
         while (isSearchingRandom)
         {
-            // Add jitter to reduce collisions
-            yield return new WaitForSeconds(2f + UnityEngine.Random.Range(0f, 0.5f));
+            // Poll fast enough that the bot fallback fires close to its stated
+            // delay; the jitter keeps two clients from scanning in lockstep.
+            float wait = 1f + UnityEngine.Random.Range(0f, 0.3f);
+            yield return new WaitForSeconds(wait);
             if (!isSearchingRandom) yield break;
+
+            searching += wait;
+
+            // Nobody showed up — hand the player a bot rather than an empty queue
+            if (searching >= botFallbackSeconds)
+            {
+                // Don't StopCoroutine ourselves here — just unwind and let the
+                // handle go, otherwise the event below would never fire.
+                isSearchingRandom = false;
+                matchmakingCo = null;
+                db.GetRef("matchmaking").Child(myUid).RemoveValueAsync();
+
+                OnBotFallback?.Invoke(queuedMode, queuedFirstTo);
+                yield break;
+            }
 
             var task = db.GetRef("matchmaking").GetValueAsync();
             yield return new WaitUntil(() => task.IsCompleted);
@@ -411,7 +440,11 @@ public class LobbyManager : MonoBehaviour
     //  Match Creation
     // ═══════════════════════════════════════════════════════════════════
 
-    string CreateMatch(string opponentUid, string opponentName, GameMode mode, int firstTo)
+    /// <param name="notify">
+    /// When false the caller joins the match itself instead of going through
+    /// OnMatchFound — used by rematches, where both sides already know each other.
+    /// </param>
+    public string CreateMatch(string opponentUid, string opponentName, GameMode mode, int firstTo, bool notify = true)
     {
         var db = FirebaseDBManager.Instance;
         string myUid = AuthManager.Instance.CurrentUser.UserId;
@@ -452,11 +485,120 @@ public class LobbyManager : MonoBehaviour
                     OnError?.Invoke("Failed to create match");
                     return;
                 }
-                OnMatchFound?.Invoke(matchId);
+                if (notify) OnMatchFound?.Invoke(matchId);
             });
         });
 
         return matchId;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Friends System
+    // ═══════════════════════════════════════════════════════════════════
+
+    public void LoadFriends()
+    {
+        var db = FirebaseDBManager.Instance;
+        if (db == null || !db.IsInitialized) return;
+        string myUid = AuthManager.Instance?.CurrentUser?.UserId;
+        if (myUid == null) return;
+
+        db.GetRef("friends").Child(myUid).GetValueAsync().ContinueWith(t =>
+        {
+            UnityMainThreadDispatcher.Enqueue(() =>
+            {
+                friendUids.Clear();
+                if (t.Result != null && t.Result.Exists)
+                {
+                    foreach (var child in t.Result.Children)
+                        friendUids.Add(child.Key);
+                }
+                RefreshFriendsList();
+            });
+        });
+    }
+
+    public void AddFriend(string friendUid, string friendName)
+    {
+        var db = FirebaseDBManager.Instance;
+        if (db == null || !db.IsInitialized) return;
+        string myUid = AuthManager.Instance?.CurrentUser?.UserId;
+        string myName = AuthManager.Instance?.DisplayName ?? "Player";
+        if (myUid == null || friendUid == myUid) return;
+
+        // Add both ways
+        db.GetRef("friends").Child(myUid).Child(friendUid).SetValueAsync(friendName);
+        db.GetRef("friends").Child(friendUid).Child(myUid).SetValueAsync(myName);
+
+        friendUids.Add(friendUid);
+        RefreshFriendsList();
+    }
+
+    public void RemoveFriend(string friendUid)
+    {
+        var db = FirebaseDBManager.Instance;
+        if (db == null || !db.IsInitialized) return;
+        string myUid = AuthManager.Instance?.CurrentUser?.UserId;
+        if (myUid == null) return;
+
+        db.GetRef("friends").Child(myUid).Child(friendUid).RemoveValueAsync();
+        db.GetRef("friends").Child(friendUid).Child(myUid).RemoveValueAsync();
+
+        friendUids.Remove(friendUid);
+        RefreshFriendsList();
+    }
+
+    public bool IsFriend(string uid) => friendUids.Contains(uid);
+
+    void RefreshFriendsList()
+    {
+        if (friendUids.Count == 0)
+        {
+            friendsList.Clear();
+            OnFriendsUpdated?.Invoke(friendsList);
+            return;
+        }
+
+        StartCoroutine(FetchFriendsWithStatus());
+    }
+
+    IEnumerator FetchFriendsWithStatus()
+    {
+        var db = FirebaseDBManager.Instance;
+        var friends = new List<OnlineUser>();
+
+        foreach (var uid in friendUids)
+        {
+            // Get name
+            var nameTask = db.GetRef("users").Child(uid).Child("displayName").GetValueAsync();
+            yield return new WaitUntil(() => nameTask.IsCompleted);
+            string name = "Player";
+            if (nameTask.Result != null && nameTask.Result.Exists)
+                name = nameTask.Result.Value.ToString();
+
+            // Check online status
+            var presTask = db.GetRef("presence").Child(uid).GetValueAsync();
+            yield return new WaitUntil(() => presTask.IsCompleted);
+            bool online = presTask.Result != null && presTask.Result.Exists;
+
+            friends.Add(new OnlineUser
+            {
+                uid = uid,
+                displayName = name,
+                isFriend = true,
+                isOnline = online
+            });
+        }
+
+        // Sort: online first, then alphabetical
+        friends.Sort((a, b) =>
+        {
+            if (a.isOnline != b.isOnline) return b.isOnline.CompareTo(a.isOnline);
+            return string.Compare(a.displayName, b.displayName, System.StringComparison.OrdinalIgnoreCase);
+        });
+
+        friendsList = friends;
+        OnFriendsUpdated?.Invoke(friendsList);
     }
 
     void OnDestroy()

@@ -5,6 +5,8 @@ public class OnlineUser
 {
     public string uid;
     public string displayName;
+    public bool isFriend;
+    public bool isOnline;
 }
 
 [Serializable]

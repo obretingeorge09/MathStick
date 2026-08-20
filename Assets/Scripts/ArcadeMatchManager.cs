@@ -29,13 +29,27 @@ public class ArcadeMatchManager : MonoBehaviour
     public event Action<string> OnError;
     public event Action<string> OnOpponentJoined;          // opponentName
 
+    // Rematch
+    public event Action OnRematchRequestedByOpponent;      // they asked first
+    public event Action OnRematchDeclined;                 // they said no / left
+    public event Action OnRematchTimedOut;
+    public event Action OnRematchStarting;                 // both agreed, joining new match
+
     DatabaseReference matchRef;
     bool listening = false;
     bool waitingForOpponent = false;
 
+    bool matchEnded = false;
+    bool rematchListening = false;
+    bool iWantRematch = false;
+    bool nextMatchCreated = false;
+    Coroutine rematchTimeoutCo;
+
     public bool IsInMatch => matchId != null;
     public bool IsHost => isHost;
     public string OpponentName => opponentName;
+    public string OpponentUid => opponentUid;
+    public bool MatchEnded => matchEnded;
     public int MyScore => myScore;
     public int OpponentScore => opponentScore;
     public int CurrentRound => currentRound;
@@ -65,6 +79,9 @@ public class ArcadeMatchManager : MonoBehaviour
         opponentScore = 0;
         currentRound = 1;
         roundActive = false;
+        matchEnded = false;
+        iWantRematch = false;
+        nextMatchCreated = false;
 
         matchRef = db.GetRef("matches").Child(matchId);
 
@@ -284,6 +301,11 @@ public class ArcadeMatchManager : MonoBehaviour
 
                 roundActive = true;
                 OnEquationReady?.Invoke();
+
+                // The round is a race with no time limit, so the host watches
+                // from the start rather than only after answering itself.
+                if (isHost)
+                    StartCoroutine(WatchForFirstCorrect(currentRound));
             });
         });
     }
@@ -315,9 +337,7 @@ public class ArcadeMatchManager : MonoBehaviour
                     return;
                 }
 
-                // If host, start checking for both answers
-                if (isHost)
-                    StartCoroutine(WaitForBothAnswers());
+                // The host is already watching; nothing more to do here.
             });
         });
     }
@@ -338,36 +358,33 @@ public class ArcadeMatchManager : MonoBehaviour
 
         string ansPath = "rounds/" + currentRound + "/answers/" + myUid;
         matchRef.Child(ansPath).SetValueAsync(answerData);
-
-        if (isHost)
-            StartCoroutine(WaitForBothAnswers());
     }
 
-    IEnumerator WaitForBothAnswers()
+    /// <summary>
+    /// Host-side round arbiter. Polls the answers node and settles the round
+    /// the moment either player is correct — there is no clock to wait for.
+    /// </summary>
+    IEnumerator WatchForFirstCorrect(int round)
     {
-        // Wait for both answers to exist (with timeout)
-        float timeout = 120f;
-        float elapsed = 0f;
-
-        while (elapsed < timeout)
+        while (isHost && matchRef != null && round == currentRound && !matchEnded)
         {
-            var task = matchRef.Child("rounds/" + currentRound + "/answers").GetValueAsync();
+            var task = matchRef.Child("rounds/" + round + "/answers").GetValueAsync();
             yield return new WaitUntil(() => task.IsCompleted);
 
-            if (task.Result != null && task.Result.ChildrenCount >= 2)
+            if (!task.IsFaulted && task.Result != null && task.Result.Exists)
             {
-                DetermineRoundWinner(task.Result);
-                yield break;
+                foreach (var child in task.Result.Children)
+                {
+                    string v = child.Child("correct").Value?.ToString() ?? "";
+                    if (v != "True" && v != "true") continue;
+
+                    DetermineRoundWinner(task.Result);
+                    yield break;
+                }
             }
 
-            yield return new WaitForSeconds(0.5f);
-            elapsed += 0.5f;
+            yield return new WaitForSeconds(0.4f);
         }
-
-        // Timeout — whoever answered correctly wins, otherwise draw
-        var finalTask = matchRef.Child("rounds/" + currentRound + "/answers").GetValueAsync();
-        yield return new WaitUntil(() => finalTask.IsCompleted);
-        DetermineRoundWinner(finalTask.Result);
     }
 
     void DetermineRoundWinner(DataSnapshot answersSnap)
@@ -505,7 +522,7 @@ public class ArcadeMatchManager : MonoBehaviour
 
                                 // After brief delay, host generates next equation
                                 if (isHost)
-                                    StartCoroutine(DelayedNextRound(1.5f));
+                                    StartCoroutine(DelayedNextRound(3.2f));
                                 else
                                     ListenForEquation(currentRound);
                             });
@@ -525,6 +542,8 @@ public class ArcadeMatchManager : MonoBehaviour
 
     void HandleMatchEnd()
     {
+        matchEnded = true;
+
         matchRef.GetValueAsync().ContinueWith(t =>
         {
             UnityMainThreadDispatcher.Enqueue(() =>
@@ -541,13 +560,158 @@ public class ArcadeMatchManager : MonoBehaviour
                     OnMatchResult?.Invoke(winner == myUid);
                 }
 
+                // The match node stays alive so either side can offer a rematch
+                StartRematchListening();
+
                 Messenger.Broadcast(Message.ArcadeMatchEnded);
             });
         });
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    //  Rematch
+    //
+    //  Both players write rematch/{uid} on the finished match. Once both
+    //  say yes, the original host creates the next match and publishes its
+    //  id under nextMatchId, which both sides are watching.
+    // ═══════════════════════════════════════════════════════════════════
+
+    void StartRematchListening()
+    {
+        if (rematchListening || matchRef == null) return;
+        rematchListening = true;
+
+        matchRef.Child("rematch").ValueChanged += OnRematchFlagsChanged;
+        matchRef.Child("nextMatchId").ValueChanged += OnNextMatchIdChanged;
+    }
+
+    void StopRematchListening()
+    {
+        if (!rematchListening || matchRef == null) return;
+        rematchListening = false;
+
+        matchRef.Child("rematch").ValueChanged -= OnRematchFlagsChanged;
+        matchRef.Child("nextMatchId").ValueChanged -= OnNextMatchIdChanged;
+
+        if (rematchTimeoutCo != null) { StopCoroutine(rematchTimeoutCo); rematchTimeoutCo = null; }
+    }
+
+    /// <summary>Player pressed REMATCH.</summary>
+    public void RequestRematch()
+    {
+        if (matchRef == null || !matchEnded || iWantRematch) return;
+
+        iWantRematch = true;
+        StartRematchListening();
+        matchRef.Child("rematch").Child(myUid).SetValueAsync(true);
+
+        if (rematchTimeoutCo != null) StopCoroutine(rematchTimeoutCo);
+        rematchTimeoutCo = StartCoroutine(RematchTimeout(25f));
+    }
+
+    /// <summary>Player backed out of the rematch (or left the result screen).</summary>
+    public void DeclineRematch()
+    {
+        if (matchRef == null || !matchEnded) return;
+
+        iWantRematch = false;
+        matchRef.Child("rematch").Child(myUid).SetValueAsync(false);
+        StopRematchListening();
+    }
+
+    IEnumerator RematchTimeout(float seconds)
+    {
+        yield return new WaitForSeconds(seconds);
+
+        if (matchEnded && iWantRematch)
+        {
+            StopRematchListening();
+            OnRematchTimedOut?.Invoke();
+        }
+    }
+
+    void OnRematchFlagsChanged(object sender, ValueChangedEventArgs e)
+    {
+        if (e.DatabaseError != null || e.Snapshot == null || opponentUid == null) return;
+
+        var oppNode = e.Snapshot.Child(opponentUid);
+        if (oppNode == null || !oppNode.Exists) return;
+
+        string val = oppNode.Value?.ToString() ?? "";
+        bool oppWants    = val == "True" || val == "true";
+        bool oppDeclined = val == "False" || val == "false";
+
+        UnityMainThreadDispatcher.Enqueue(() =>
+        {
+            if (oppDeclined)
+            {
+                StopRematchListening();
+                OnRematchDeclined?.Invoke();
+                return;
+            }
+
+            if (!oppWants) return;
+
+            if (!iWantRematch)
+            {
+                OnRematchRequestedByOpponent?.Invoke();
+                return;
+            }
+
+            // Both agreed — the original host builds the next match
+            if (isHost) StartCoroutine(CreateNextMatch());
+        });
+    }
+
+    IEnumerator CreateNextMatch()
+    {
+        if (nextMatchCreated) yield break;
+        nextMatchCreated = true;
+
+        var lobby = LobbyManager.Instance;
+        if (lobby == null) yield break;
+
+        string newId = lobby.CreateMatch(opponentUid, opponentName, matchMode, firstTo, false);
+
+        // CreateMatch writes asynchronously — wait until the node is really there
+        // before pointing the opponent at it, or their JoinMatch reads nothing.
+        var db = FirebaseDBManager.Instance;
+        float waited = 0f;
+        while (waited < 10f)
+        {
+            var check = db.GetRef("matches").Child(newId).Child("hostUid").GetValueAsync();
+            yield return new WaitUntil(() => check.IsCompleted);
+
+            if (check.Result != null && check.Result.Exists) break;
+
+            yield return new WaitForSeconds(0.3f);
+            waited += 0.3f;
+        }
+
+        matchRef.Child("nextMatchId").SetValueAsync(newId);
+    }
+
+    void OnNextMatchIdChanged(object sender, ValueChangedEventArgs e)
+    {
+        if (e.DatabaseError != null || e.Snapshot == null || !e.Snapshot.Exists) return;
+
+        string newId = e.Snapshot.Value?.ToString();
+        if (string.IsNullOrEmpty(newId)) return;
+
+        UnityMainThreadDispatcher.Enqueue(() =>
+        {
+            StopRematchListening();
+            OnRematchStarting?.Invoke();
+
+            Cleanup();
+            JoinMatch(newId);
+        });
+    }
+
     void HandleAbandoned()
     {
+        matchEnded = true;
+
         // If I didn't abandon, I win
         matchRef.Child("winner").GetValueAsync().ContinueWith(t =>
         {
@@ -584,6 +748,9 @@ public class ArcadeMatchManager : MonoBehaviour
         var db = FirebaseDBManager.Instance;
         if (db == null || opponentUid == null) yield break;
 
+        // The match is already decided — a late disconnect must not rewrite the winner
+        if (matchEnded) yield break;
+
         var task = db.GetRef("presence").Child(opponentUid).GetValueAsync();
         yield return new WaitUntil(() => task.IsCompleted);
 
@@ -604,16 +771,22 @@ public class ArcadeMatchManager : MonoBehaviour
 
     public void LeaveMatch()
     {
-        if (matchRef != null)
+        // Only forfeit a match that is still running — never rewrite a finished result
+        if (matchRef != null && !matchEnded)
         {
             matchRef.Child("state").SetValueAsync("abandoned");
             matchRef.Child("winner").SetValueAsync(opponentUid ?? "");
+        }
+        else if (matchRef != null && matchEnded)
+        {
+            DeclineRematch();
         }
         Cleanup();
     }
 
     public void Cleanup()
     {
+        StopRematchListening();
         StopListening();
 
         if (matchRef != null && opponentUid != null)
@@ -629,6 +802,9 @@ public class ArcadeMatchManager : MonoBehaviour
         opponentName = null;
         roundActive = false;
         waitingForOpponent = false;
+        matchEnded = false;
+        iWantRematch = false;
+        nextMatchCreated = false;
     }
 
     void OnDestroy()

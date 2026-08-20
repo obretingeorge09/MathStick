@@ -1,34 +1,127 @@
 using UnityEngine;
+using UnityEngine.UI;
 
-// The +/− operator built from two matchstick segments.
-// Horizontal bar (line1) + vertical bar (line2) selected = PLUS
-// Only horizontal bar (line1) selected                   = MINUS
-// Player taps each matchstick individually, just like digit segments.
+// The +/− operator: one key, one tap. Minus becomes plus, plus becomes minus.
+//
+// It used to be two independently tappable matchsticks, which turned two
+// meanings into four states — "neither lit" and "only the vertical lit" were
+// dead ends that could never be correct. CheckAnswer fell through silently on
+// both, so a player could place every digit right and have the game say
+// nothing. In Hard, with two operators, 12 of the 16 combinations were dead.
+//
+// As a single toggle there is no invalid state left to get stuck in.
 public class PlusMinus : MonoBehaviour
 {
-    public Line line1 = null; // horizontal bar
-    public Line line2 = null; // vertical bar
+    public Line line1 = null;   // horizontal bar — always shown
+    public Line line2 = null;   // vertical bar — shown only for plus
 
-    public bool IsPlus()
+    bool isPlus = false;
+
+    void Awake()
     {
-        return line1 != null && line1.IsSelected()
-            && line2 != null && line2.IsSelected();
+        EnsureClickTarget();
     }
 
-    public bool IsMinus()
+    /// <summary>
+    /// A scene built before this became a single key still has two separately
+    /// tappable bars and no Button. The state now lives in a bool, so tapping
+    /// a bar there changes its colour but never the operator — it sticks on
+    /// minus forever. Rather than fail that way, build the missing key here.
+    /// </summary>
+    void EnsureClickTarget()
     {
-        return line1 != null && line1.IsSelected()
-            && (line2 == null || !line2.IsSelected());
+        if (GetComponentInChildren<Button>(true) != null) return;   // scene is current
+
+        Debug.LogWarning("PlusMinus: this scene predates the single-key operator. " +
+                         "Built a fallback key at runtime — re-run PlusMinus > Build Scene.");
+
+        // The bars must stop eating the tap before the key can receive it
+        foreach (var line in new[] { line1, line2 })
+        {
+            if (line == null) continue;
+            var img = line.GetComponent<Image>();
+            if (img != null) img.raycastTarget = false;
+        }
+
+        var go = new GameObject("btn_face");
+        go.transform.SetParent(transform, false);
+
+        var rt = go.AddComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = rt.offsetMax = Vector2.zero;
+
+        var face = go.AddComponent<Image>();
+        face.color = new Color(0f, 0f, 0f, 0.01f);
+
+        var btn = go.AddComponent<Button>();
+        btn.targetGraphic = face;
+        btn.onClick.AddListener(Toggle);
+
+        // Behind the bars visually; raycasts still reach it since they are off
+        go.transform.SetAsFirstSibling();
     }
 
-    // Called at the start of each round — both bars unlit, player must compose
+    public bool IsPlus()  => isPlus;
+    public bool IsMinus() => !isPlus;
+
+    /// <summary>Flip the operator. Wired to the key's Button.</summary>
+    public void Toggle()
+    {
+        isPlus = !isPlus;
+        Apply();
+
+        AudioManager.Instance?.PlaySFX(ClickSound());
+        Messenger.Broadcast(Message.CheckForSolution);
+    }
+
+    /// <summary>Start of a round. Minus is the resting state, and it is valid.</summary>
     public void ResetToggle()
     {
-        if (line1) line1.SetActive();
-        if (line2) line2.SetActive();
+        isPlus = false;
+        Apply();
     }
 
-    // Legacy stubs
-    public void SetPlus()  { if (line1) line1.SetSelected(); if (line2) line2.SetSelected(); }
-    public void SetMinus() { if (line1) line1.SetSelected(); if (line2) line2.SetActive(); }
+    public void SetPlus()  { isPlus = true;  Apply(); }
+    public void SetMinus() { isPlus = false; Apply(); }
+
+    void Apply()
+    {
+        if (line1 != null)
+        {
+            line1.gameObject.SetActive(true);
+            line1.SetSelected();
+        }
+
+        if (line2 != null)
+        {
+            // Hidden rather than dimmed when minus: a faint second stick is
+            // exactly what made this read as two separate controls.
+            line2.gameObject.SetActive(isPlus);
+            if (isPlus) line2.SetSelected();
+        }
+    }
+
+    // Same procedural click the segments use, so the operator does not sound
+    // like a different kind of control.
+    static AudioClip s_click;
+
+    static AudioClip ClickSound()
+    {
+        if (s_click != null) return s_click;
+
+        const int rate = 44100;
+        const float dur = 0.1f;
+        int n = (int)(rate * dur);
+
+        s_click = AudioClip.Create("pmClick", n, 1, rate, false);
+        var data = new float[n];
+        for (int i = 0; i < n; i++)
+        {
+            float t = i / (float)rate;
+            float freq = 800f * Mathf.Exp(-t * 10f);
+            data[i] = Mathf.Sin(2f * Mathf.PI * freq * t) * (1f - t / dur);
+        }
+        s_click.SetData(data, 0);
+        return s_click;
+    }
 }

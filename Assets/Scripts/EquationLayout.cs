@@ -22,25 +22,53 @@ public class EquationLayout : MonoBehaviour
     public float portraitScale = 1f;
     public float landscapeScale = 1f;
 
-    bool wasLandscape = false;
-    bool initialized = false;
+    bool currentLandscape = false;
 
-    void Start()
+    Canvas rootCanvas;
+    RectTransform canvasRect;
+
+    void OnEnable()
     {
-        bool isLandscape = Screen.width > Screen.height * 1.2f;
-        wasLandscape = isLandscape;
-        Apply(isLandscape);
-        initialized = true;
+        // Find the root canvas to get actual rendered dimensions
+        rootCanvas = GetComponentInParent<Canvas>();
+        if (rootCanvas != null)
+        {
+            var root = rootCanvas.rootCanvas;
+            canvasRect = root.GetComponent<RectTransform>();
+        }
+
+        currentLandscape = CheckLandscape();
+        Apply(currentLandscape);
     }
 
     void Update()
     {
-        bool isLandscape = Screen.width > Screen.height * 1.2f;
-        if (isLandscape != wasLandscape)
+        bool landscape = CheckLandscape();
+        if (landscape != currentLandscape)
         {
-            wasLandscape = isLandscape;
-            Apply(isLandscape);
+            currentLandscape = landscape;
+            Debug.Log($"EquationLayout: switched to {(landscape ? "LANDSCAPE" : "PORTRAIT")}");
+            Apply(landscape);
         }
+    }
+
+    bool CheckLandscape()
+    {
+        // Use canvas rect dimensions — these reflect actual rendered area
+        // accounting for CanvasScaler and device simulator
+        if (canvasRect != null)
+        {
+            var r = canvasRect.rect;
+            return r.width > r.height;
+        }
+        // Fallback to screen dimensions
+        return Screen.width > Screen.height;
+    }
+
+    public void ForceApply(bool landscape)
+    {
+        currentLandscape = landscape;
+        Apply(landscape);
     }
 
     void Apply(bool landscape)

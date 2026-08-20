@@ -14,26 +14,41 @@ public class Line : MonoBehaviour, IPointerClickHandler
     Image shadow = null;  // dark offset duplicate for depth
     Image glow   = null;  // outer halo (larger rect behind body, semi-transparent when selected)
 
-    // ── Palette (7-Segment Display) ───────────────────────────────────────
-    // Active = visible amber segment
-    static readonly Color SegActive   = new Color(0.72f, 0.45f, 0.03f, 1f);
-    // Selected = phosphorescent bright amber
-    static readonly Color SegSelected = new Color(0.98f, 0.88f, 0.10f, 1f);
-    // Glow when selected (larger rect on top, creates outer halo)
-    static readonly Color GlowOn      = new Color(0.98f, 0.88f, 0.10f, 0.60f);
-    // Inactive = dark amber housing (visible but unlit, like real 7-segment display)
-    static readonly Color SegInactive = new Color(0.10f, 0.06f, 0.01f, 1f);
-    // Always off
+    // ── Palette — reads from GameSettings if available ────────────────
+    static Color SegSelected {
+        get {
+            var gs = GameSettings.Instance;
+            return gs != null ? gs.SelectedSegColor : new Color(0.75f, 1.00f, 0.15f, 1f);
+        }
+    }
+    static Color SegActive {
+        get {
+            var gs = GameSettings.Instance;
+            return gs != null ? gs.ActiveSegColor : new Color(0.72f, 0.45f, 0.03f, 1f);
+        }
+    }
+    static Color SegInactive {
+        get {
+            var gs = GameSettings.Instance;
+            return gs != null ? gs.InactiveSegColor : new Color(0.10f, 0.06f, 0.01f, 1f);
+        }
+    }
+    static Color GlowOn {
+        get {
+            var gs = GameSettings.Instance;
+            return gs != null ? gs.GlowColor : new Color(0.70f, 1.00f, 0.10f, 0.45f);
+        }
+    }
     static readonly Color GlowOff     = new Color(0f, 0f, 0f, 0f);
-    // Shadow colors
     static readonly Color ShadowOn    = new Color(0f, 0f, 0f, 0.25f);
     static readonly Color ShadowInactive = new Color(0f, 0f, 0f, 0.10f);
-    // Glow padding constant
-    const float GLOW_PAD = 10f;
+    const float GLOW_PAD = 50f;
 
-    // ── Sprite cache for beveled segments ──────────────────────────────────
-    static Sprite s_hSeg;  // horizontal segment sprite (76x16)
-    static Sprite s_vSeg;  // vertical segment sprite (16x64)
+    // ── Sprite cache ───────────────────────────────────────────────────────
+    static Sprite s_hSeg;   // horizontal segment sprite
+    static Sprite s_vSeg;   // vertical segment sprite
+    static Sprite s_hGlow;  // horizontal glow sprite (blurred)
+    static Sprite s_vGlow;  // vertical glow sprite (blurred)
 
     // ── Setup ──────────────────────────────────────────────────────────────
     void Awake()
@@ -54,13 +69,17 @@ public class Line : MonoBehaviour, IPointerClickHandler
         Messenger.AddListener(Message.GameWon,      OnGameWon);
         Messenger.AddListener(Message.StartNewGame, OnNewGame);
 
-        // Shadow — dark offset copy behind body (renders first = behind)
-        shadow = MakeRect("Shadow", new Vector2(2f, -2f), rt.sizeDelta, ShadowOn);
-        shadow.transform.SetAsFirstSibling();
-
-        // Glow — slightly larger rect at same center, creates outer halo when selected
+        // Glow — blurred larger sprite behind everything for diffuse light emission
         Vector2 glowSize = rt.sizeDelta + new Vector2(GLOW_PAD * 2, GLOW_PAD * 2);
         glow = MakeRect("Glow", Vector2.zero, glowSize, GlowOff);
+        glow.sprite = horiz
+            ? (s_hGlow != null ? s_hGlow : (s_hGlow = MakeGlowSprite(Mathf.RoundToInt(glowSize.x), Mathf.RoundToInt(glowSize.y), true)))
+            : (s_vGlow != null ? s_vGlow : (s_vGlow = MakeGlowSprite(Mathf.RoundToInt(glowSize.x), Mathf.RoundToInt(glowSize.y), false)));
+        glow.transform.SetAsFirstSibling(); // behind everything
+
+        // Shadow — dark offset copy behind body
+        shadow = MakeRect("Shadow", new Vector2(2f, -2f), rt.sizeDelta, ShadowOn);
+        shadow.transform.SetSiblingIndex(1); // between glow and body
 
         // Apply initial state (Active by default, will be overridden by Initialize if needed)
         ApplyState();
@@ -108,7 +127,7 @@ public class Line : MonoBehaviour, IPointerClickHandler
     {
         state = SegState.Selected;
         StopAllCoroutines();
-        Apply(SegSelected, GlowOff, ShadowOn);
+        Apply(SegSelected, GlowOn, ShadowOn);
         StartCoroutine(Bounce());
     }
 
@@ -148,7 +167,7 @@ public class Line : MonoBehaviour, IPointerClickHandler
     {
         switch (state)
         {
-            case SegState.Selected: Apply(SegSelected, GlowOff, ShadowOn);       break;
+            case SegState.Selected: Apply(SegSelected, GlowOn, ShadowOn);        break;
             case SegState.Active:   Apply(SegActive,   GlowOff, ShadowOn);       break;
             case SegState.Inactive: Apply(SegInactive, GlowOff, ShadowInactive); break;
         }
@@ -179,9 +198,14 @@ public class Line : MonoBehaviour, IPointerClickHandler
         while (true)
         {
             t += Time.deltaTime;
-            float pulse = 0.7f + 0.3f * Mathf.Sin(t * 8f);
+            float pulse = 0.7f + 0.3f * Mathf.Sin(t * 6f);
             if (body)
-                body.color = new Color(SegSelected.r, SegSelected.g * pulse, SegSelected.b * (0.3f + 0.7f * pulse));
+                body.color = new Color(
+                    SegSelected.r * (0.8f + 0.2f * pulse),
+                    SegSelected.g * pulse,
+                    SegSelected.b * (0.2f + 0.8f * pulse));
+            if (glow)
+                glow.color = new Color(GlowOn.r, GlowOn.g, GlowOn.b, GlowOn.a * pulse);
             yield return null;
         }
     }
@@ -200,32 +224,114 @@ public class Line : MonoBehaviour, IPointerClickHandler
         return img;
     }
 
-    // ── Sprite generation for authentic 7-segment display ──────────────────
-    static Sprite MakeBeveledSprite(int w, int h)
+    // ── Glow sprite — soft gaussian blur for diffuse light emission ─────
+    static Sprite MakeGlowSprite(int w, int h, bool horizontal)
     {
-        int bevel = Mathf.Min(w, h) / 3;  // ~5px for 16-pixel-thick segments
-        var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        // Use higher-res texture for smooth gradient
+        int tw = w * 2, th = h * 2;
+        var tex = new Texture2D(tw, th, TextureFormat.RGBA32, false);
         tex.filterMode = FilterMode.Bilinear;
+        tex.wrapMode   = TextureWrapMode.Clamp;
 
-        for (int y = 0; y < h; y++)
-        for (int x = 0; x < w; x++)
+        float cx = tw * 0.5f, cy = th * 0.5f;
+
+        // Small sigma relative to total size — light concentrates at center
+        // and fades to zero well before the edges
+        float sigX = horizontal ? tw * 0.22f : tw * 0.28f;
+        float sigY = horizontal ? th * 0.28f : th * 0.22f;
+
+        for (int y = 0; y < th; y++)
+        for (int x = 0; x < tw; x++)
         {
-            int dl = x;           // distance from left
-            int dr = w - 1 - x;   // distance from right
-            int dt = h - 1 - y;   // distance from top
-            int db = y;           // distance from bottom
-
-            // Check if pixel is in a beveled corner (45-degree chamfer)
-            bool cut = (dl < bevel && db < bevel && dl + db < bevel) ||  // bottom-left
-                       (dr < bevel && db < bevel && dr + db < bevel) ||  // bottom-right
-                       (dl < bevel && dt < bevel && dl + dt < bevel) ||  // top-left
-                       (dr < bevel && dt < bevel && dr + dt < bevel);    // top-right
-
-            tex.SetPixel(x, y, cut ? Color.clear : Color.white);
+            float dx = (x - cx + 0.5f) / sigX;
+            float dy = (y - cy + 0.5f) / sigY;
+            float a  = Mathf.Exp(-(dx * dx + dy * dy));
+            // Smooth to zero at edges — no hard cutoff
+            a *= a; // square for sharper center, softer tails
+            tex.SetPixel(x, y, new Color(1f, 1f, 1f, a));
         }
 
         tex.Apply();
-        return Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 1f);
+        return Sprite.Create(tex, new Rect(0, 0, tw, th), new Vector2(0.5f, 0.5f), 1f);
+    }
+
+    // ── Sprite generation — authentic LCD digital-clock segment ─────────
+    static Sprite MakeBeveledSprite(int w, int h)
+    {
+        // Higher resolution for crisp anti-aliased edges
+        int tw = Mathf.Max(w, 64);
+        int th = Mathf.Max(h, 64);
+        if (w > h) { th = Mathf.RoundToInt(tw * (float)h / w); }
+        else       { tw = Mathf.RoundToInt(th * (float)w / h); }
+        tw = Mathf.Max(tw, 4); th = Mathf.Max(th, 4);
+
+        var tex = new Texture2D(tw, th, TextureFormat.RGBA32, false);
+        tex.filterMode = FilterMode.Bilinear;
+        tex.wrapMode   = TextureWrapMode.Clamp;
+
+        bool horizontal = w > h;
+
+        if (horizontal)
+        {
+            // Horizontal: hexagon with pointed left/right ends  < ══════ >
+            float hh    = th * 0.5f;
+            float bevel = hh; // 45° pointed ends
+
+            for (int y = 0; y < th; y++)
+            for (int x = 0; x < tw; x++)
+            {
+                float fy   = y - hh + 0.5f;
+                float absY = Mathf.Abs(fy);
+                float leftEdge  = bevel * (absY / hh);
+                float rightEdge = tw - bevel * (absY / hh);
+
+                if (x >= leftEdge - 0.5f && x <= rightEdge + 0.5f)
+                {
+                    float aL    = Mathf.Clamp01(x - leftEdge + 1f);
+                    float aR    = Mathf.Clamp01(rightEdge - x + 1f);
+                    float alpha = Mathf.Min(aL, aR);
+
+                    // Inner bevel: slight brightness gradient for 3D LCD depth
+                    float distFromTop = (hh - fy) / th;
+                    float lum = 0.82f + 0.18f * (1f - distFromTop);
+                    tex.SetPixel(x, y, new Color(lum, lum, lum, alpha));
+                }
+                else
+                    tex.SetPixel(x, y, Color.clear);
+            }
+        }
+        else
+        {
+            // Vertical: hexagon rotated 90° — pointed top/bottom
+            float hw    = tw * 0.5f;
+            float bevel = hw;
+
+            for (int y = 0; y < th; y++)
+            for (int x = 0; x < tw; x++)
+            {
+                float fx   = x - hw + 0.5f;
+                float absX = Mathf.Abs(fx);
+                float botEdge = bevel * (absX / hw);
+                float topEdge = th - bevel * (absX / hw);
+
+                if (y >= botEdge - 0.5f && y <= topEdge + 0.5f)
+                {
+                    float aB    = Mathf.Clamp01(y - botEdge + 1f);
+                    float aT    = Mathf.Clamp01(topEdge - y + 1f);
+                    float alpha = Mathf.Min(aB, aT);
+
+                    // Inner bevel: slight brightness gradient for 3D LCD depth
+                    float distFromLeft = (hw + fx) / tw;
+                    float lum = 0.80f + 0.20f * distFromLeft;
+                    tex.SetPixel(x, y, new Color(lum, lum, lum, alpha));
+                }
+                else
+                    tex.SetPixel(x, y, Color.clear);
+            }
+        }
+
+        tex.Apply();
+        return Sprite.Create(tex, new Rect(0, 0, tw, th), new Vector2(0.5f, 0.5f), 1f);
     }
 
 }

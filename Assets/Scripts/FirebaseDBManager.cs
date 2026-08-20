@@ -12,8 +12,24 @@ public class FirebaseDBManager : MonoBehaviour
     DatabaseReference presenceRef;
     bool initialized = false;
 
+    // Difference between server clock and this device's clock, in milliseconds.
+    // Kept live via the .info/serverTimeOffset special node so daily streaks
+    // cannot be farmed by changing the device date.
+    long serverTimeOffsetMs = 0;
+
     public DatabaseReference Root => root;
     public bool IsInitialized => initialized;
+
+    /// <summary>Server-side UTC time, or device UTC time if the offset isn't known yet.</summary>
+    public DateTime ServerNowUtc =>
+        DateTimeOffset.FromUnixTimeMilliseconds(
+            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + serverTimeOffsetMs).UtcDateTime;
+
+    /// <summary>Server date as "yyyy-MM-dd" — the key daily streaks are compared on.</summary>
+    public string ServerDateKey => ServerNowUtc.ToString("yyyy-MM-dd");
+
+    /// <summary>Server month as "yyyy-MM" — the key monthly leaderboards are stored under.</summary>
+    public string ServerMonthKey => ServerNowUtc.ToString("yyyy-MM");
 
     void Awake()
     {
@@ -32,12 +48,45 @@ public class FirebaseDBManager : MonoBehaviour
             initialized = true;
             Debug.Log("FirebaseDB initialized");
 
+            TrackServerTimeOffset();
+
             if (AuthManager.Instance != null && AuthManager.Instance.IsLoggedIn)
                 SetupPresence();
         }
         catch (Exception e)
         {
             Debug.LogError("FirebaseDB init failed: " + e.Message);
+        }
+    }
+
+    /// <summary>
+    /// Subscribes to Firebase's .info/serverTimeOffset so ServerNowUtc stays accurate
+    /// even if the player changes their device clock.
+    /// </summary>
+    void TrackServerTimeOffset()
+    {
+        try
+        {
+            FirebaseDatabase.DefaultInstance
+                .GetReference(".info/serverTimeOffset")
+                .ValueChanged += (sender, e) =>
+                {
+                    if (e.DatabaseError != null || e.Snapshot == null || !e.Snapshot.Exists) return;
+
+                    long offset;
+                    if (long.TryParse(e.Snapshot.Value.ToString(), out offset))
+                        serverTimeOffsetMs = offset;
+                    else
+                    {
+                        double d;
+                        if (double.TryParse(e.Snapshot.Value.ToString(), out d))
+                            serverTimeOffsetMs = (long)d;
+                    }
+                };
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("Server time offset unavailable, using device clock: " + e.Message);
         }
     }
 
