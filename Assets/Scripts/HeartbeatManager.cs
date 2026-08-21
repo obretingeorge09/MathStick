@@ -24,6 +24,11 @@ public class HeartbeatManager : MonoBehaviour
 
     void OnFadeTransparent(string name)
     {
+        // Arcade rounds run a stopwatch (max = 0): there is no countdown to
+        // dramatise, and a zero max reads as ratio 0 = permanent 180 BPM panic.
+        if (GameManager.Instance != null && GameManager.Instance.isArcadeMode)
+            return;
+
         if (name == "fadeToTransparentBeforeGameStarts")
             StartBeating();
     }
@@ -37,7 +42,12 @@ public class HeartbeatManager : MonoBehaviour
         if (AudioManager.Instance != null && AudioManager.Instance.IsMuted) return;
         if (Time.time < nextBeatTime) return;
 
-        float ratio = maxTimer > 0 ? Mathf.Clamp01(currentTimer / maxTimer) : 0f;
+        // No countdown (the arcade stopwatch broadcasts max = 0) → no beat.
+        // Without this, ratio read 0 = max panic at full volume, forever —
+        // e.g. after leaving a training round mid-game and entering arcade.
+        if (maxTimer <= 0f) return;
+
+        float ratio = Mathf.Clamp01(currentTimer / maxTimer);
         float bpm = 40f + Mathf.Pow(1f - ratio, 0.8f) * 140f;  // 40 BPM idle → 180 BPM panic
         float interval = 60f / bpm;
         float volume = Mathf.Lerp(0.50f, 0.85f, 1f - ratio);   // loud from start → very loud
