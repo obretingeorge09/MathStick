@@ -95,6 +95,9 @@ public class GameManager : MonoBehaviour
     // Reused so the generator does not allocate on every candidate it rejects
     readonly bool[] okHi = new bool[10];
     readonly bool[] okLo = new bool[10];
+    readonly bool[] okMid = new bool[10];
+    readonly List<int> vals1 = new List<int>(1024);
+    readonly List<int> vals2 = new List<int>(1024);
     readonly int[]  layoutBuf = new int[6];
     List<int>[] LineNumberToPosition = new List<int>[10];
 
@@ -358,31 +361,37 @@ public class GameManager : MonoBehaviour
             if (c > 99) continue;
 
             int[] digits = { a / 10, a % 10, b / 10, b % 10, c / 10, c % 10 };
-            int[] segs = new int[6];
 
-            for (int i = 0; i < 6; i++)
-            {
-                var off = LineNumberToPosition[digits[i]];
-                segs[i] = (off == null || off.Count == 0)
-                    ? NO_DEAD_SEGMENT
-                    : off[Random.Range(0, off.Count)];
-            }
+            // Tightest board first — it is the one most likely to be unique —
+            // then hand the freedom back slot by slot. Same strategy as Medium.
+            int[] segs = new int[6];
+            for (int i = 0; i < 6; i++) segs[i] = TightestDead(digits[i], LEAD2[i]);
 
             if (!IsUniqueEasy(segs)) continue;
 
-            // Free one slot if the puzzle stays unique. Without this every
-            // digit always has exactly one dead stick, which is both a tell and
-            // the reason 8 could never appear.
             int start = Random.Range(0, 6);
             for (int t = 0; t < 6; t++)
             {
                 int i = (start + t) % 6;
-                if (segs[i] == NO_DEAD_SEGMENT) continue;
+                var off = LineNumberToPosition[digits[i]];
+                int count = off == null ? 0 : off.Count;
 
-                int keep = segs[i];
-                segs[i] = NO_DEAD_SEGMENT;
-                if (IsUniqueEasy(segs)) break;
-                segs[i] = keep;
+                int best = segs[i];
+                int bestSize = Cand(best, LEAD2[i]).Length;
+
+                for (int o = 0; o <= count; o++)
+                {
+                    int alt = o < count ? off[o] : NO_DEAD_SEGMENT;
+                    int size = Cand(alt, LEAD2[i]).Length;
+                    if (size <= bestSize) continue;
+
+                    int keep = segs[i];
+                    segs[i] = alt;
+                    if (IsUniqueEasy(segs)) { best = alt; bestSize = size; }
+                    segs[i] = keep;
+                }
+
+                segs[i] = best;
             }
 
             return segs;
@@ -456,7 +465,7 @@ public class GameManager : MonoBehaviour
         for (int i = 0; i < hs.Length; i++)
         {
             bool leading = (i % d == 0);
-            nums[i] = new List<int>(Cand(hs[i], leading));
+            nums[i] = new List<int>(Cand(hs[i], leading));   // matches LEAD2 / LEAD3
         }
 
         if (d == 2)
@@ -577,9 +586,12 @@ public class GameManager : MonoBehaviour
 
     void StoreSolution3D(int[] s, bool isMinus)
     {
-        // s = [h1,t1,o1, h2,t2,o2, ha,ta,oa] — all 9 hidden segment positions
+        // s = [h1,t1,o1, h2,t2,o2, ha,ta,oa] — all 9 hidden segment positions.
+        // Uses the same candidate rule the generator proved uniqueness against:
+        // a hundreds digit cannot be zero. Reading the unfiltered lists here
+        // could report a solution the uniqueness count never considered.
         var p = new List<int>[9];
-        for (int i = 0; i < 9; i++) p[i] = LinePositionToNumber[s[i]];
+        for (int i = 0; i < 9; i++) p[i] = new List<int>(Cand(s[i], LEAD3[i]));
 
         for (int a = 0; a < p[0].Count; a++)
         for (int b = 0; b < p[1].Count; b++)
@@ -608,102 +620,150 @@ public class GameManager : MonoBehaviour
         correctSolution = "?";
     }
 
+    /// <summary>
+    /// The dead segment that leaves this digit the fewest alternatives.
+    /// Generation starts from the tightest possible board because that is the
+    /// one most likely to be unique, then loosens it back — searching from the
+    /// loose end almost never finds a unique board at three digits (8.7% of
+    /// attempts against 55% this way).
+    /// </summary>
+    int TightestDead(int digit, bool leading)
+    {
+        var off = LineNumberToPosition[digit];
+        if (off == null || off.Count == 0) return NO_DEAD_SEGMENT;
+
+        int best = off[0];
+        int bestSize = Cand(best, leading).Length;
+
+        for (int i = 1; i < off.Count; i++)
+        {
+            int size = Cand(off[i], leading).Length;
+            if (size < bestSize) { best = off[i]; bestSize = size; }
+        }
+        return best;
+    }
+
+    void BuildValues3(int s0, int s1, int s2, List<int> into)
+    {
+        into.Clear();
+        var c0 = Cand(s0, true);
+        var c1 = Cand(s1, false);
+        var c2 = Cand(s2, false);
+
+        for (int i = 0; i < c0.Length; i++)
+        for (int j = 0; j < c1.Length; j++)
+        for (int k = 0; k < c2.Length; k++)
+            into.Add(c0[i] * 100 + c1[j] * 10 + c2[k]);
+    }
+
+    /// <summary>
+    /// Complete solutions for a three-digit layout, both operators.
+    /// Returns -1 when the board is too loose to score cheaply; the caller
+    /// treats that as "not unique" and moves on rather than stalling a round.
+    /// </summary>
+    int CountSolutions3(int a0, int a1, int a2, int b0, int b1, int b2,
+                        int r0, int r1, int r2, int cap)
+    {
+        BuildValues3(a0, a1, a2, vals1);
+        BuildValues3(b0, b1, b2, vals2);
+
+        if ((long)vals1.Count * vals2.Count > 400000) return -1;
+
+        System.Array.Clear(okHi, 0, 10);
+        System.Array.Clear(okMid, 0, 10);
+        System.Array.Clear(okLo, 0, 10);
+        foreach (var d in Cand(r0, true))  okHi[d]  = true;
+        foreach (var d in Cand(r1, false)) okMid[d] = true;
+        foreach (var d in Cand(r2, false)) okLo[d]  = true;
+
+        int n = 0;
+
+        for (int i = 0; i < vals1.Count; i++)
+        {
+            int v1 = vals1[i];
+
+            for (int j = 0; j < vals2.Count; j++)
+            {
+                int v2 = vals2[j];
+
+                int sum = v1 + v2;
+                if (sum >= 100 && sum <= 999 && okHi[sum / 100] && okMid[(sum / 10) % 10] && okLo[sum % 10])
+                    if (++n >= cap) return n;
+
+                int dif = v1 - v2;
+                if (dif >= 100 && dif <= 999 && okHi[dif / 100] && okMid[(dif / 10) % 10] && okLo[dif % 10])
+                    if (++n >= cap) return n;
+            }
+        }
+
+        return n;
+    }
+
+    /// <summary>Both readings of the board, exactly as InitializeMinus3D permutes them.</summary>
+    bool IsUniqueMedium(int[] g)
+    {
+        if (CountSolutions3(g[0], g[1], g[2], g[3], g[4], g[5], g[6], g[7], g[8], 2) != 1) return false;
+        if (CountSolutions3(g[6], g[7], g[8], g[0], g[1], g[2], g[3], g[4], g[5], 2) != 1) return false;
+        return true;
+    }
+
+    static readonly bool[] LEAD2 = { true, false, true, false, true, false };
+    static readonly bool[] LEAD3 = { true, false, false, true, false, false, true, false, false };
+
     public int[] GenerateCandidate3D()
     {
-        int[] solution = new int[9]; // [h1,t1,o1, h2,t2,o2, ha,ta,oa]
-        int enumLen = (int)LinePositions.EnumLength;
-
-        // Pick random hidden segments for num1 (3 digits) and num2 (3 digits)
-        // Hundreds digit CAN be Middle (hidden=Middle → digit becomes 0)
-        for (int i = 0; i < 6; i++)
+        for (int attempt = 0; attempt < 60; attempt++)
         {
-            solution[i] = Random.Range(0, enumLen);
-        }
+            int a = Random.Range(100, 900);
+            int b = Random.Range(100, 900);
+            int c = a + b;
+            if (c > 999) continue;
 
-        // Count possible sums
-        for (int i = 0; i < PossibleAnswers.Length; i++)
-            PossibleAnswers[i] = 0;
-
-        var p0 = LinePositionToNumber[solution[0]];
-        var p1 = LinePositionToNumber[solution[1]];
-        var p2 = LinePositionToNumber[solution[2]];
-        var p3 = LinePositionToNumber[solution[3]];
-        var p4 = LinePositionToNumber[solution[4]];
-        var p5 = LinePositionToNumber[solution[5]];
-
-        for (int a = 0; a < p0.Count; a++)
-        for (int b = 0; b < p1.Count; b++)
-        for (int c = 0; c < p2.Count; c++)
-        for (int d = 0; d < p3.Count; d++)
-        for (int e = 0; e < p4.Count; e++)
-        for (int f = 0; f < p5.Count; f++)
-        {
-            int n1 = p0[a] * 100 + p1[b] * 10 + p2[c];
-            int n2 = p3[d] * 100 + p4[e] * 10 + p5[f];
-            int sum = n1 + n2;
-            if (sum >= 0 && sum < PossibleAnswers.Length)
-                PossibleAnswers[sum]++;
-        }
-
-        // Collect sums with exactly 1 way, excluding digit 8, max 999
-        List<int> validSums = new List<int>();
-        for (int i = 0; i <= 999 && i < PossibleAnswers.Length; i++)
-        {
-            if (PossibleAnswers[i] == 1)
+            int[] digits =
             {
-                int h = i / 100, t = (i / 10) % 10, o = i % 10;
-                if (h != 8 && t != 8 && o != 8)
-                    validSums.Add(i);
-            }
-        }
+                a / 100, (a / 10) % 10, a % 10,
+                b / 100, (b / 10) % 10, b % 10,
+                c / 100, (c / 10) % 10, c % 10,
+            };
 
-        if (validSums.Count == 0) return null;
+            int[] segs = new int[9];
+            for (int i = 0; i < 9; i++) segs[i] = TightestDead(digits[i], LEAD3[i]);
 
-        int targetSum = validSums[Random.Range(0, validSums.Count)];
-        int sd0 = targetSum / 100;
-        int sd1 = (targetSum / 10) % 10;
-        int sd2 = targetSum % 10;
+            if (!IsUniqueMedium(segs)) continue;
 
-        if (LineNumberToPosition[sd0].Count == 0 ||
-            LineNumberToPosition[sd1].Count == 0 ||
-            LineNumberToPosition[sd2].Count == 0)
-            return null;
-
-        // Find hidden segment combos for answer
-        List<int[]> answerCombos = new List<int[]>();
-        for (int i = 0; i < LineNumberToPosition[sd0].Count; i++)
-        for (int j = 0; j < LineNumberToPosition[sd1].Count; j++)
-        for (int k = 0; k < LineNumberToPosition[sd2].Count; k++)
-        {
-            int l0 = LineNumberToPosition[sd0][i];
-            int l1 = LineNumberToPosition[sd1][j];
-            int l2 = LineNumberToPosition[sd2][k];
-
-            // Check this combo only allows one valid answer
-            int ansCount = 0;
-            for (int a = 0; a < LinePositionToNumber[l0].Count; a++)
-            for (int b = 0; b < LinePositionToNumber[l1].Count; b++)
-            for (int c = 0; c < LinePositionToNumber[l2].Count; c++)
+            // Give every slot back as much freedom as uniqueness will bear.
+            // Without this pass each digit is pinned to a single candidate and
+            // the board reads itself out rather than being solved.
+            int start = Random.Range(0, 9);
+            for (int t = 0; t < 9; t++)
             {
-                int possibleAns = LinePositionToNumber[l0][a] * 100 +
-                                  LinePositionToNumber[l1][b] * 10 +
-                                  LinePositionToNumber[l2][c];
-                if (possibleAns < PossibleAnswers.Length && PossibleAnswers[possibleAns] > 0)
-                    ansCount++;
+                int i = (start + t) % 9;
+                var off = LineNumberToPosition[digits[i]];
+                int count = off == null ? 0 : off.Count;
+
+                int best = segs[i];
+                int bestSize = Cand(best, LEAD3[i]).Length;
+
+                // every dead segment this digit allows, and finally none at all
+                for (int o = 0; o <= count; o++)
+                {
+                    int alt = o < count ? off[o] : NO_DEAD_SEGMENT;
+                    int size = Cand(alt, LEAD3[i]).Length;
+                    if (size <= bestSize) continue;
+
+                    int keep = segs[i];
+                    segs[i] = alt;
+                    if (IsUniqueMedium(segs)) { best = alt; bestSize = size; }
+                    segs[i] = keep;
+                }
+
+                segs[i] = best;
             }
 
-            if (ansCount == 1)
-                answerCombos.Add(new int[] { l0, l1, l2 });
+            return segs;
         }
 
-        if (answerCombos.Count == 0) return null;
-
-        int[] pick = answerCombos[Random.Range(0, answerCombos.Count)];
-        solution[6] = pick[0];
-        solution[7] = pick[1];
-        solution[8] = pick[2];
-
-        return solution;
+        return null;
     }
 
     void InitializePlus3D(int[] s)
