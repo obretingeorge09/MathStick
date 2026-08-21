@@ -200,6 +200,30 @@ public class LobbyManager : MonoBehaviour
 
             searching += wait;
 
+            // Were WE claimed since the last poll? The claimant writes the
+            // matchId into OUR queue entry — finding it there is the handshake.
+            // Without this check the claimed side never learns the match id:
+            // its entry just vanished, it kept polling an empty queue, and the
+            // bot fallback quietly swallowed every real 1v1 pairing.
+            var mineTask = db.GetRef("matchmaking").Child(myUid).GetValueAsync();
+            yield return new WaitUntil(() => mineTask.IsCompleted);
+            if (!isSearchingRandom) yield break;
+
+            if (!mineTask.IsFaulted && mineTask.Result != null && mineTask.Result.Exists)
+            {
+                var claimedId = mineTask.Result.Child("matchId");
+                if (claimedId != null && claimedId.Value != null)
+                {
+                    string foundMatchId = claimedId.Value.ToString();
+                    isSearchingRandom = false;
+                    matchmakingCo = null;
+                    db.GetRef("matchmaking").Child(myUid).RemoveValueAsync();
+
+                    OnMatchFound?.Invoke(foundMatchId);
+                    yield break;
+                }
+            }
+
             // Nobody showed up — hand the player a bot rather than an empty queue
             if (searching >= botFallbackSeconds)
             {
@@ -258,14 +282,29 @@ public class LobbyManager : MonoBehaviour
         var db = FirebaseDBManager.Instance;
         string myUid = AuthManager.Instance.CurrentUser.UserId;
 
-        // Use transaction to atomically remove both from queue
-        var txTask = db.GetRef("matchmaking").RunTransaction(mutableData =>
+        // The match id is minted BEFORE the claim so it can ride inside it —
+        // push ids are generated client-side, no server round-trip involved.
+        string matchId = db.GetRef("matches").Push().Key;
+
+        // Claim = a CAS on the OPPONENT's queue entry alone. That single node
+        // is the contention point: whichever host's transaction lands first
+        // wins, the other aborts and keeps searching. Scoping it to the child
+        // (rather than transacting on the whole matchmaking node) matters:
+        //  - the security rules only grant child-level writes here — a root
+        //    transaction would need a root .write that lets any client wipe
+        //    the entire queue;
+        //  - writing {matchId, hostUid} instead of deleting is the handshake
+        //    the claimed side's poll is looking for (see PollForMatch).
+        var txTask = db.GetRef("matchmaking").Child(oppUid).RunTransaction(mutableData =>
         {
-            if (mutableData.Child(oppUid).Value == null)
+            if (mutableData.Value == null)
                 return TransactionResult.Abort(); // opponent already taken
 
-            mutableData.Child(myUid).Value = null;
-            mutableData.Child(oppUid).Value = null;
+            mutableData.Value = new Dictionary<string, object>
+            {
+                ["matchId"] = matchId,
+                ["hostUid"] = myUid
+            };
             return TransactionResult.Success(mutableData);
         });
 
@@ -277,9 +316,13 @@ public class LobbyManager : MonoBehaviour
             yield break;
         }
 
+        // Won the claim: leave the queue ourselves (owner delete, always
+        // allowed by the rules), then create the match at the id we handed over.
+        db.GetRef("matchmaking").Child(myUid).RemoveValueAsync();
+
         // Success — create match
         isSearchingRandom = false;
-        CreateMatch(oppUid, oppName, mode, firstTo);
+        CreateMatch(oppUid, oppName, mode, firstTo, true, matchId);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -444,13 +487,18 @@ public class LobbyManager : MonoBehaviour
     /// When false the caller joins the match itself instead of going through
     /// OnMatchFound — used by rematches, where both sides already know each other.
     /// </param>
-    public string CreateMatch(string opponentUid, string opponentName, GameMode mode, int firstTo, bool notify = true)
+    public string CreateMatch(string opponentUid, string opponentName, GameMode mode, int firstTo, bool notify = true, string presetMatchId = null)
     {
         var db = FirebaseDBManager.Instance;
         string myUid = AuthManager.Instance.CurrentUser.UserId;
         string myName = AuthManager.Instance.DisplayName;
 
-        var matchRef = db.GetRef("matches").Push();
+        // A queue claim mints the id up front so it can travel inside the
+        // claim write (push ids are client-generated); everyone else gets a
+        // fresh one here.
+        var matchRef = presetMatchId != null
+            ? db.GetRef("matches").Child(presetMatchId)
+            : db.GetRef("matches").Push();
         string matchId = matchRef.Key;
 
         var matchData = new Dictionary<string, object>
