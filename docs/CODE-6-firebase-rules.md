@@ -1,53 +1,226 @@
 # MathStick — Firebase Realtime Database rules
 
-> Published at console.firebase.google.com for project `plusminus-46df9`.
-> `.indexOn: "elo"` is required or leaderboard queries sort on the phone.
-> Known gap: no `.validate` constraints yet, so the client can write any value.
+> **Generated file — do not edit.** Mirrors `firebase-database-rules.json` at
+> the repository root, which is the versioned source; publish THAT wholesale at
+> console.firebase.google.com for project `plusminus-46df9` (the rules parser
+> accepts the `//` comments).
+> v2 (2026-08-21): creation seeding, per-write delta bounds, monotonic
+> counters, signed invites, pair-scoped friends, player-scoped matches, and the
+> leaderboard↔stats elo cross-check. `.indexOn: "elo"` is required or
+> leaderboard queries sort on the phone.
 
 ```json
 {
+  // ═══════════════════════════════════════════════════════════════════════
+  //  MathStick — Realtime Database rules, v2 (2026-08-21)
+  //
+  //  Publish WHOLESALE from the Firebase console (comments are accepted by
+  //  the rules parser):
+  //  console.firebase.google.com/project/plusminus-46df9/database/
+  //      plusminus-46df9-default-rtdb/rules
+  //
+  //  Design constraints these rules are written against, verified in code:
+  //
+  //  1. PlayerStatsManager.Save() and DailyManager.Save() use
+  //     UpdateChildrenAsync — a MULTI-LOCATION update. Each child path is
+  //     validated on its own, and sibling values from the same update are
+  //     NOT visible to each other. So no rule below compares one stats
+  //     field against another; every rule stands alone. (The v1 rule
+  //     "wins <= parent.matches" rejected the very first save of a brand
+  //     new account for exactly this reason.)
+  //
+  //  2. LobbyManager claims a queued opponent with a transaction scoped to
+  //     matchmaking/{oppUid} ONLY, writing {matchId, hostUid} into it. A
+  //     transaction needs .write at the node it runs on, so nothing here
+  //     grants (or needs) a matchmaking-root write.
+  //
+  //  3. The leaderboard row is written immediately after the stats update
+  //     on the same client connection, so the server has already applied
+  //     the new elo when the row validates against root. A row elo that
+  //     does not match stats/{uid}/elo is a forgery and dies here — this is
+  //     what actually closes the "fake Master on a public board" hole.
+  // ═══════════════════════════════════════════════════════════════════════
+
   "rules": {
+
+    ".read": false,
+    ".write": false,
+
     "users": {
       ".read": "auth != null",
-      "$uid": { ".write": "auth != null && auth.uid == $uid" }
+      "$uid": {
+        ".write": "auth != null && auth.uid == $uid",
+        "displayName": { ".validate": "newData.isString() && newData.val().length <= 32" },
+        "online":      { ".validate": "newData.isBoolean()" },
+        "lastSeen":    { ".validate": "newData.isNumber()" },
+        "$other":      { ".validate": false }
+      }
     },
 
     "presence": {
       ".read": "auth != null",
-      "$uid": { ".write": "auth != null && auth.uid == $uid" }
+      "$uid": {
+        ".write": "auth != null && auth.uid == $uid",
+        ".validate": "newData.isBoolean()"
+      }
     },
 
     "matchmaking": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      "$uid": {
+        // Owner creates/updates their own entry. Anyone authenticated may
+        // DELETE one (leaving / claiming clears entries). A claimant may
+        // REPLACE one, but only with the exact {matchId, hostUid} handshake,
+        // signed with their own uid — so a claim cannot be forged as coming
+        // from someone else.
+        ".write": "auth != null && (auth.uid == $uid || !newData.exists() || (data.exists() && newData.hasChildren(['matchId','hostUid']) && newData.child('hostUid').val() == auth.uid))",
+        "displayName": { ".validate": "newData.isString() && newData.val().length <= 32" },
+        "timestamp":   { ".validate": "newData.isNumber()" },
+        "mode":        { ".validate": "newData.isString() && newData.val().length <= 16" },
+        "firstTo":     { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 15" },
+        "matchId":     { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "hostUid":     { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "$other":      { ".validate": false }
+      }
     },
 
     "matches": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      "$matchId": {
+        // Create: only as a match you are IN, with yourself as host.
+        // Update: only the two players. This is what stops a third party
+        // rewriting scores or declaring a winner.
+        ".write": "auth != null && ((!data.exists() && newData.child('hostUid').val() == auth.uid && newData.child('players').hasChild(auth.uid)) || data.child('players').hasChild(auth.uid))",
+        "hostUid":      { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "state":        { ".validate": "newData.isString() && newData.val().length <= 16" },
+        "winner":       { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "currentRound": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 999" },
+        "nextMatchId":  { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "settings": {
+          "mode":    { ".validate": "newData.isString() && newData.val().length <= 16" },
+          "firstTo": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 15" },
+          "$other":  { ".validate": false }
+        },
+        "players": {
+          "$playerUid": {
+            "name":   { ".validate": "newData.isString() && newData.val().length <= 32" },
+            "ready":  { ".validate": "newData.isBoolean()" },
+            "$other": { ".validate": false }
+          }
+        },
+        "scores": {
+          "$playerUid": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 999" }
+        },
+        "rematch": {
+          "$playerUid": { ".validate": "newData.isBoolean()" }
+        },
+        // Rounds carry the equation payload and per-player answers. Their
+        // shape is owned by the client and free to evolve, so it stays open
+        // here — membership (the .write above) is the protection.
+        "rounds": {
+        },
+        "$other": { ".validate": false }
+      }
     },
 
     "invites": {
       "$uid": {
         ".read": "auth != null && auth.uid == $uid",
-        ".write": "auth != null"
+        "$inviteId": {
+          // Create: any authenticated sender, but the invite must be signed
+          // with their own uid — forged senders die on the fromUid check.
+          // Update/delete: the recipient (it is their inbox) or the original
+          // sender (cancel, watch status).
+          ".write": "auth != null && ((!data.exists() && newData.child('fromUid').val() == auth.uid) || auth.uid == $uid || data.child('fromUid').val() == auth.uid)",
+          "fromUid":   { ".validate": "newData.isString() && newData.val().length <= 64" },
+          "fromName":  { ".validate": "newData.isString() && newData.val().length <= 32" },
+          "mode":      { ".validate": "newData.isString() && newData.val().length <= 16" },
+          "firstTo":   { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 15" },
+          "timestamp": { ".validate": "newData.isNumber()" },
+          "status":    { ".validate": "newData.isString() && newData.val().length <= 16" },
+          "matchId":   { ".validate": "newData.isString() && newData.val().length <= 64" },
+          "$other":    { ".validate": false }
+        }
       }
     },
 
     "friends": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      "$uid": {
+        ".read": "auth != null",
+        "$friendId": {
+          // A friendship writes both directions: your own list, and your
+          // entry in THEIR list. So a write is legal only if you own the
+          // list, or you ARE the entry being written/removed. Nobody can
+          // touch a pair they are not half of — v1's blanket write let any
+          // account delete anyone's entire friends list.
+          ".write": "auth != null && (auth.uid == $uid || auth.uid == $friendId)",
+          ".validate": "newData.isString() && newData.val().length <= 32"
+        }
+      }
     },
 
     "stats": {
       ".read": "auth != null",
-      "$uid": { ".write": "auth != null && auth.uid == $uid" }
+      "$uid": {
+        ".write": "auth != null && auth.uid == $uid",
+
+        // Creation is pinned to the game's actual starting state (elo 1000,
+        // coins 0 — START_COINS is paid on the first finished match, not on
+        // account creation). After that, per-write deltas bound the
+        // invisible cheat and absolute ceilings kill the visible one.
+        // Coin delta headroom: the biggest legitimate single write is the
+        // first finished match (+100 starter +30 Hard win = +130); the
+        // biggest daily grant is the capped streak bonus (+150). 300 covers
+        // both with room, and decreases (entry fees) are unrestricted.
+        "elo": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2500 && (data.exists() ? (newData.val() - data.val() <= 60 && data.val() - newData.val() <= 60) : newData.val() == 1000)"
+        },
+        "coins": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000 && (data.exists() ? newData.val() - data.val() <= 300 : newData.val() == 0)"
+        },
+
+        // Career counters only ever go up, and they start at zero.
+        "matches":    { ".validate": "newData.isNumber() && newData.val() <= 1000000 && (data.exists() ? newData.val() >= data.val() : newData.val() == 0)" },
+        "wins":       { ".validate": "newData.isNumber() && newData.val() <= 1000000 && (data.exists() ? newData.val() >= data.val() : newData.val() == 0)" },
+        "losses":     { ".validate": "newData.isNumber() && newData.val() <= 1000000 && (data.exists() ? newData.val() >= data.val() : newData.val() == 0)" },
+        "roundsWon":  { ".validate": "newData.isNumber() && newData.val() <= 10000000 && (data.exists() ? newData.val() >= data.val() : newData.val() == 0)" },
+        "roundsLost": { ".validate": "newData.isNumber() && newData.val() <= 10000000 && (data.exists() ? newData.val() >= data.val() : newData.val() == 0)" },
+
+        "currentStreak": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000" },
+        "bestStreak":    { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000 && (!data.exists() || newData.val() >= data.val())" },
+
+        "displayName": { ".validate": "newData.isString() && newData.val().length <= 32" },
+        "country":     { ".validate": "newData.isString() && newData.val().length == 2" },
+        "updatedAt":   { ".validate": "newData.isNumber()" },
+        "$other":      { ".validate": false }
+      }
     },
 
     "daily": {
       "$uid": {
         ".read": "auth != null && auth.uid == $uid",
-        ".write": "auth != null && auth.uid == $uid"
+        ".write": "auth != null && auth.uid == $uid",
+
+        "streak":        { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000" },
+        "longestStreak": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000" },
+
+        // Dates are yyyy-MM-dd strings produced from the SERVER clock
+        // (FirebaseDBManager.ServerDateKey), so rolling the phone's date
+        // forward does not advance a streak.
+        "lastLoginDate":     { ".validate": "newData.isString() && newData.val().length <= 10" },
+        "streakClaimedDate": { ".validate": "newData.isString() && newData.val().length <= 10" },
+        "challengeDate":     { ".validate": "newData.isString() && newData.val().length <= 10" },
+
+        "challenges": {
+          "$idx": {
+            "type":     { ".validate": "newData.isString() && newData.val().length <= 32" },
+            "target":   { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 9999" },
+            "progress": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 9999" },
+            "claimed":  { ".validate": "newData.isBoolean()" },
+            "$other":   { ".validate": false }
+          }
+        },
+        "$other": { ".validate": false }
       }
     },
 
@@ -55,19 +228,42 @@
       ".read": "auth != null",
       "global": {
         "$month": {
+          // Without this index Firebase downloads every row to the phone and
+          // sorts locally, burning the free-tier quota.
           ".indexOn": "elo",
-          "$uid": { ".write": "auth != null && auth.uid == $uid" }
+          "$uid": {
+            ".write": "auth != null && auth.uid == $uid",
+            // The row must carry the same elo the (delta-bounded) stats node
+            // already holds — see header note 3. This is the anti-forgery.
+            ".validate": "newData.child('elo').val() == root.child('stats').child($uid).child('elo').val()",
+            "name":    { ".validate": "newData.isString() && newData.val().length <= 32" },
+            "elo":     { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2500" },
+            "wins":    { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "country": { ".validate": "newData.isString() && newData.val().length == 2" },
+            "$other":  { ".validate": false }
+          }
         }
       },
       "country": {
         "$cc": {
           "$month": {
             ".indexOn": "elo",
-            "$uid": { ".write": "auth != null && auth.uid == $uid" }
+            "$uid": {
+              ".write": "auth != null && auth.uid == $uid",
+              // Same elo cross-check, plus: a row filed under a country board
+              // must actually claim that country.
+              ".validate": "newData.child('elo').val() == root.child('stats').child($uid).child('elo').val() && newData.child('country').val() == $cc",
+              "name":    { ".validate": "newData.isString() && newData.val().length <= 32" },
+              "elo":     { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2500" },
+              "wins":    { ".validate": "newData.isNumber() && newData.val() >= 0" },
+              "country": { ".validate": "newData.isString() && newData.val().length == 2" },
+              "$other":  { ".validate": false }
+            }
           }
         }
       }
     }
+
   }
 }
 ```
