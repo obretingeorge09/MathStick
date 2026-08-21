@@ -128,7 +128,12 @@ public class Line : MonoBehaviour, IPointerClickHandler
         state = SegState.Selected;
         StopAllCoroutines();
         Apply(SegSelected, GlowOn, ShadowOn);
-        StartCoroutine(Bounce());
+
+        // Only bounce if there is somebody to see it. Unity cannot run a
+        // coroutine on a hidden object, and the round is set up before the
+        // game panel is revealed.
+        if (isActiveAndEnabled) StartCoroutine(Bounce());
+        else                    transform.localScale = Vector3.one;
     }
 
     public void SetActive()
@@ -151,7 +156,7 @@ public class Line : MonoBehaviour, IPointerClickHandler
     public bool IsInactive() => state == SegState.Inactive;
 
     // ── Events ─────────────────────────────────────────────────────────────
-    void OnGameWon()  { if (state == SegState.Selected) StartCoroutine(Phosphor()); }
+    void OnGameWon()  { if (state == SegState.Selected && isActiveAndEnabled) StartCoroutine(Phosphor()); }
     void OnNewGame()  { StopAllCoroutines(); ApplyState(); }
 
     // ── Apply colours ──────────────────────────────────────────────────────
