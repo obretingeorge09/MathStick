@@ -80,7 +80,22 @@ public class GameManager : MonoBehaviour
         Messenger.AddListener(Message.GameLost, () => { gameActive = false; });
     }
 
-    List<int>[] LinePositionToNumber = new List<int>[(int)LinePositions.EnumLength];
+    // A digit slot is constrained by ONE dead segment, or by NO_DEAD_SEGMENT,
+    // which means every stick is the player's to place. Digit 8 needs all seven
+    // sticks, so NO_DEAD_SEGMENT is the only way it can ever appear.
+    public const int NO_DEAD_SEGMENT = 7;
+
+    List<int>[] LinePositionToNumber = new List<int>[NO_DEAD_SEGMENT + 1];
+
+    // Candidate digits per constraint, cached as arrays. A leading digit may
+    // not be zero, or the puzzle reads "07 + 12".
+    int[][] candAll  = new int[NO_DEAD_SEGMENT + 1][];
+    int[][] candLead = new int[NO_DEAD_SEGMENT + 1][];
+
+    // Reused so the generator does not allocate on every candidate it rejects
+    readonly bool[] okHi = new bool[10];
+    readonly bool[] okLo = new bool[10];
+    readonly int[]  layoutBuf = new int[6];
     List<int>[] LineNumberToPosition = new List<int>[10];
 
     void Start()
@@ -103,6 +118,12 @@ public class GameManager : MonoBehaviour
         LineNumberToPosition[7] = new List<int> { (int)LinePositions.Bottom, (int)LinePositions.BottomLeft, (int)LinePositions.Middle, (int)LinePositions.TopLeft };
         LineNumberToPosition[8] = new List<int> { };
         LineNumberToPosition[9] = new List<int> { (int)LinePositions.BottomLeft };
+
+        // With no dead segment every digit is reachable, 8 included
+        LinePositionToNumber[NO_DEAD_SEGMENT] = new List<int> { 0,1,2,3,4,5,6,7,8,9 };
+        LineNumberToPosition[8] = new List<int> { NO_DEAD_SEGMENT };
+
+        BuildCandidateTables();
     }
 
     // ── Check answer using player's chosen operation ──────────────────────
@@ -249,99 +270,127 @@ public class GameManager : MonoBehaviour
     }
 
     // ── Generate a raw candidate solution (hidden segment positions) ──────
-    public int[] GenerateCandidate()
+    void BuildCandidateTables()
     {
-        int[] solution = new int[6];
-
-        solution[0] = Random.Range(0, (int)LinePositions.EnumLength - 1);
-        solution[1] = Random.Range(0, (int)LinePositions.EnumLength);
-        solution[2] = Random.Range(0, (int)LinePositions.EnumLength - 1);
-        solution[3] = Random.Range(0, (int)LinePositions.EnumLength);
-
-        if (solution[0] == (int)LinePositions.Middle)
-            solution[0] = (int)LinePositions.EnumLength - 1;
-        if (solution[2] == (int)LinePositions.Middle)
-            solution[2] = (int)LinePositions.EnumLength - 1;
-
-        if (solution[0] == (int)LinePositions.TopRight && solution[2] == (int)LinePositions.TopRight)
+        for (int p = 0; p <= NO_DEAD_SEGMENT; p++)
         {
-            if (Random.Range(0, 2) == 0)
-                solution[0] = (int)LinePositions.EnumLength - 1;
-            else
-                solution[2] = (int)LinePositions.EnumLength - 1;
+            var src = LinePositionToNumber[p];
+            candAll[p] = src.ToArray();
+
+            var lead = new List<int>();
+            foreach (var d in src) if (d != 0) lead.Add(d);
+            candLead[p] = lead.ToArray();
         }
-
-        // Count possible sums
-        for (int i = 0; i < PossibleAnswers.Length; i++)
-            PossibleAnswers[i] = 0;
-
-        for (int i = 0; i < LinePositionToNumber[solution[0]].Count; i++)
-        for (int j = 0; j < LinePositionToNumber[solution[1]].Count; j++)
-        for (int k = 0; k < LinePositionToNumber[solution[2]].Count; k++)
-        for (int l = 0; l < LinePositionToNumber[solution[3]].Count; l++)
-        {
-            int d1 = LinePositionToNumber[solution[0]][i];
-            int d2 = LinePositionToNumber[solution[1]][j];
-            int d3 = LinePositionToNumber[solution[2]][k];
-            int d4 = LinePositionToNumber[solution[3]][l];
-            int sum = d1 * 10 + d2 + d3 * 10 + d4;
-            if (sum < PossibleAnswers.Length)
-                PossibleAnswers[sum]++;
-        }
-
-        // Collect sums that have exactly 1 way to be formed, excluding digit 8
-        List<int> validSums = new List<int>();
-        for (int i = 10; i < PossibleAnswers.Length; i++)
-        {
-            if (PossibleAnswers[i] == 1 && i / 10 != 8 && i % 10 != 8)
-                validSums.Add(i);
-        }
-
-        if (validSums.Count == 0) return null;
-
-        // Pick a random valid sum and find answer hidden segments
-        int targetSum = validSums[Random.Range(0, validSums.Count)];
-        int sd1 = targetSum / 10;
-        int sd2 = targetSum % 10;
-
-        // Skip if digits don't have valid positions (e.g., digit 8)
-        if (sd1 < 0 || sd1 >= LineNumberToPosition.Length || LineNumberToPosition[sd1] == null || LineNumberToPosition[sd1].Count == 0)
-            return null;
-        if (sd2 < 0 || sd2 >= LineNumberToPosition.Length || LineNumberToPosition[sd2] == null || LineNumberToPosition[sd2].Count == 0)
-            return null;
-
-        // Find hidden segment combos for the answer digits
-        List<int> answerCombos = new List<int>();
-        for (int j = 0; j < LineNumberToPosition[sd1].Count; j++)
-        for (int k = 0; k < LineNumberToPosition[sd2].Count; k++)
-        {
-            int l1 = LineNumberToPosition[sd1][j];
-            int l2 = LineNumberToPosition[sd2][k];
-
-            // Check this combo only allows one valid answer number
-            int ansCount = 0;
-            for (int a = 0; a < LinePositionToNumber[l1].Count; a++)
-            for (int b = 0; b < LinePositionToNumber[l2].Count; b++)
-            {
-                int possibleAns = LinePositionToNumber[l1][a] * 10 + LinePositionToNumber[l2][b];
-                if (PossibleAnswers[possibleAns] > 0)
-                    ansCount++;
-            }
-
-            if (ansCount == 1)
-                answerCombos.Add(l1 * 100 + l2);
-        }
-
-        if (answerCombos.Count == 0) return null;
-
-        int pick = answerCombos[Random.Range(0, answerCombos.Count)];
-        solution[4] = pick / 100;
-        solution[5] = pick % 100;
-
-        return solution;
     }
 
-    // ── Check answer (Hard mode: A op1 B op2 C = D) ────────────────────────
+    int[] Cand(int pos, bool leading) => leading ? candLead[pos] : candAll[pos];
+
+    /// <summary>
+    /// Counts complete solutions for a two-digit layout — operands AND answer —
+    /// over BOTH operators, stopping once it reaches cap.
+    ///
+    /// The old generator only counted operand pairs per sum and assumed the
+    /// answer was then forced. It is not: the answer digits have candidates of
+    /// their own, so a different operand pair reaching a different sum the
+    /// answer can also spell is an equally valid solution. That is why 81% of
+    /// generated puzzles had more than one right answer, some as many as 99.
+    /// CheckAnswer accepts either operator, so both must be counted here too.
+    /// </summary>
+    int CountSolutions2(int s0, int s1, int s2, int s3, int s4, int s5, int cap)
+    {
+        var c0 = Cand(s0, true);
+        var c1 = Cand(s1, false);
+        var c2 = Cand(s2, true);
+        var c3 = Cand(s3, false);
+
+        System.Array.Clear(okHi, 0, 10);
+        System.Array.Clear(okLo, 0, 10);
+        foreach (var d in Cand(s4, true))  okHi[d] = true;
+        foreach (var d in Cand(s5, false)) okLo[d] = true;
+
+        int n = 0;
+
+        for (int i = 0; i < c0.Length; i++)
+        for (int j = 0; j < c1.Length; j++)
+        {
+            int n1 = c0[i] * 10 + c1[j];
+
+            for (int k = 0; k < c2.Length; k++)
+            for (int l = 0; l < c3.Length; l++)
+            {
+                int n2 = c2[k] * 10 + c3[l];
+
+                int sum = n1 + n2;
+                if (sum >= 10 && sum <= 99 && okHi[sum / 10] && okLo[sum % 10])
+                    if (++n >= cap) return n;
+
+                int dif = n1 - n2;
+                if (dif >= 10 && dif <= 99 && okHi[dif / 10] && okLo[dif % 10])
+                    if (++n >= cap) return n;
+            }
+        }
+
+        return n;
+    }
+
+    /// <summary>
+    /// The plus layout shows slots 0..5 in order; InitializeMinus permutes them
+    /// so the answer slot becomes the first operand. The player picks the
+    /// operator, so a puzzle is only honest if BOTH readings have exactly one
+    /// solution.
+    /// </summary>
+    bool IsUniqueEasy(int[] g)
+    {
+        if (CountSolutions2(g[0], g[1], g[2], g[3], g[4], g[5], 2) != 1) return false;
+        if (CountSolutions2(g[4], g[5], g[0], g[1], g[2], g[3], 2) != 1) return false;
+        return true;
+    }
+
+    public int[] GenerateCandidate()
+    {
+        for (int attempt = 0; attempt < 300; attempt++)
+        {
+            // Start from a real equation rather than from constraints: this way
+            // a solution always exists and only uniqueness has to be proven.
+            int a = Random.Range(10, 100);
+            int b = Random.Range(10, 90);
+            int c = a + b;
+            if (c > 99) continue;
+
+            int[] digits = { a / 10, a % 10, b / 10, b % 10, c / 10, c % 10 };
+            int[] segs = new int[6];
+
+            for (int i = 0; i < 6; i++)
+            {
+                var off = LineNumberToPosition[digits[i]];
+                segs[i] = (off == null || off.Count == 0)
+                    ? NO_DEAD_SEGMENT
+                    : off[Random.Range(0, off.Count)];
+            }
+
+            if (!IsUniqueEasy(segs)) continue;
+
+            // Free one slot if the puzzle stays unique. Without this every
+            // digit always has exactly one dead stick, which is both a tell and
+            // the reason 8 could never appear.
+            int start = Random.Range(0, 6);
+            for (int t = 0; t < 6; t++)
+            {
+                int i = (start + t) % 6;
+                if (segs[i] == NO_DEAD_SEGMENT) continue;
+
+                int keep = segs[i];
+                segs[i] = NO_DEAD_SEGMENT;
+                if (IsUniqueEasy(segs)) break;
+                segs[i] = keep;
+            }
+
+            return segs;
+        }
+
+        return null;
+    }
+
     void CheckAnswerHard()
     {
         int a = number1_hard.GetNumber();
@@ -399,9 +448,16 @@ public class GameManager : MonoBehaviour
         // For 2-digit: [d1,d2, d3,d4, a1,a2] (6 entries)
         // For 3-digit: [d1,d2,d3, d4,d5,d6, a1,a2,a3] (9 entries)
         int d = digitsPerNum;
+
+        // Same candidate rule the generator proved uniqueness against: a
+        // leading digit cannot be zero. Using the unfiltered list here would
+        // let this report a solution the uniqueness count never considered.
         var nums = new List<int>[hs.Length];
         for (int i = 0; i < hs.Length; i++)
-            nums[i] = LinePositionToNumber[hs[i]];
+        {
+            bool leading = (i % d == 0);
+            nums[i] = new List<int>(Cand(hs[i], leading));
+        }
 
         if (d == 2)
         {

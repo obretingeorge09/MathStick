@@ -24,8 +24,11 @@ public class Digit : MonoBehaviour
             if (Lines[i] != null)
                 Lines[i].SetActive();
         }
-        if (Lines[(int)lp] != null)
-            Lines[(int)lp].SetInactive();
+        // A slot can now be fully free: GameManager.NO_DEAD_SEGMENT is one past
+        // the last real segment, and it is the only way digit 8 can be built.
+        int idx = (int)lp;
+        if (idx >= 0 && idx < Lines.Length && Lines[idx] != null)
+            Lines[idx].SetInactive();
     }
 
     public int GetDigit()
