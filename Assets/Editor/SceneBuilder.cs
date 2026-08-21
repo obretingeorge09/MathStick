@@ -164,13 +164,25 @@ public static class SceneBuilder
         Img(st, "StartBG", V2(0,0), V2(1,1), V2(0,0), V2(0,0), Hex("#080C16")).raycastTarget = false;
 
         // ── Title — digital segment letters ─────────────────────────────
-        DigTxt(st, "lbl_title_glow", "MATHSTICK", V2(.5f,1), V2(.5f,1), V2(2,-648), V2(900,210), 140, Hex("#F59E0B10")).raycastTarget = false;
-        DigTxt(st, "lbl_title_main", "MATHSTICK", V2(.5f,1), V2(.5f,1), V2(0,-646), V2(900,210), 140, ACCENT).raycastTarget = false;
-        DigTxt(st, "lbl_title2_glow", "PUZZLE", V2(.5f,1), V2(.5f,1), V2(2,-808), V2(900,165), 110, Hex("#F59E0B10")).raycastTarget = false;
-        DigTxt(st, "lbl_title2_main", "PUZZLE", V2(.5f,1), V2(.5f,1), V2(0,-806), V2(900,165), 110, ACCENT).raycastTarget = false;
+        DigTxt(st, "lbl_title_glow", "MATHSTICK", V2(.5f,1), V2(.5f,1), V2(2,-398), V2(900,210), 140, Hex("#F59E0B10")).raycastTarget = false;
+        DigTxt(st, "lbl_title_main", "MATHSTICK", V2(.5f,1), V2(.5f,1), V2(0,-396), V2(900,210), 140, ACCENT).raycastTarget = false;
+        DigTxt(st, "lbl_title2_glow", "PUZZLE", V2(.5f,1), V2(.5f,1), V2(2,-558), V2(900,165), 110, Hex("#F59E0B10")).raycastTarget = false;
+        DigTxt(st, "lbl_title2_main", "PUZZLE", V2(.5f,1), V2(.5f,1), V2(0,-556), V2(900,165), 110, ACCENT).raycastTarget = false;
 
         // Decorative segment-bar under title
-        Img(st, "TitleSeg", V2(.5f,1), V2(.5f,1), V2(0,-880), V2(160, 4), Hex("#F59E0B30")).raycastTarget = false;
+        Img(st, "TitleSeg", V2(.5f,1), V2(.5f,1), V2(0,-630), V2(160, 4), Hex("#F59E0B30")).raycastTarget = false;
+
+        // ── Digit legend — the one thing a new player cannot guess ───────
+        // Nothing else on screen explains that a digit is made of seven sticks
+        // in a fixed housing. Showing all ten with their unlit segments still
+        // drawn teaches the rule, not just the shapes.
+        DigTxt(st, "lbl_legend_tag", "EVERY DIGIT IS SEVEN STICKS", V2(.5f,1), V2(.5f,1),
+            V2(0,-672), V2(900,24), 16, TEXT_MUTED).raycastTarget = false;
+
+        // 10 cells at a 76px pitch spans 754px, inside the 898px of usable
+        // width the 978px canvas leaves after its 40px gutters.
+        for (int d = 0; d < 10; d++)
+            LegendDigit(st, d, V2(-342f + d * 76f, -790f), 0.58f);
 
         // ── Menu stack — anchored to the top so it keeps a fixed distance
         //    from the logo instead of drifting on taller screens ────────
@@ -1735,6 +1747,68 @@ public static class SceneBuilder
         n.FirstDigit  = Digit(go.transform, "DigitA", V2(0, 0));
         n.SecondDigit = Digit(go.transform, "DigitB", V2(+spacing, 0));
         return n;
+    }
+
+    // Which of the seven segments are lit for each numeral, in the order the
+    // Digit builder places them: Top, Middle, Bottom, TopLeft, TopRight,
+    // BottomLeft, BottomRight.
+    static readonly bool[][] DIGIT_SEGMENTS =
+    {
+        //          Top    Mid    Bot    TL     TR     BL     BR
+        new[] {     true,  false, true,  true,  true,  true,  true  }, // 0
+        new[] {     false, false, false, false, true,  false, true  }, // 1
+        new[] {     true,  true,  true,  false, true,  true,  false }, // 2
+        new[] {     true,  true,  true,  false, true,  false, true  }, // 3
+        new[] {     false, true,  false, true,  true,  false, true  }, // 4
+        new[] {     true,  true,  true,  true,  false, false, true  }, // 5
+        new[] {     true,  true,  true,  true,  false, true,  true  }, // 6
+        new[] {     true,  false, false, false, true,  false, true  }, // 7
+        new[] {     true,  true,  true,  true,  true,  true,  true  }, // 8
+        new[] {     true,  true,  true,  true,  true,  false, true  }, // 9
+    };
+
+    /// <summary>
+    /// A non-interactive seven-segment numeral for the menu legend.
+    ///
+    /// Deliberately draws the UNLIT segments too, in the same dim colour the
+    /// game uses: the whole point is to show that every digit lives inside the
+    /// same eight-shaped housing and differs only by which sticks are lit.
+    /// A picture of just the lit sticks would teach the shapes but not the rule.
+    /// </summary>
+    static void LegendDigit(Transform parent, int value, Vector2 pos, float scale)
+    {
+        var go = Panel(parent, "legend_" + value, V2(.5f,1), V2(.5f,1), pos, V2(DW * scale, DH * scale));
+        var t  = go.transform;
+
+        var lit = DIGIT_SEGMENTS[value];
+
+        float hw = SHW * scale, hh = SHH * scale;
+        float vw = SVW * scale, vh = SVH * scale;
+        float sx = SX * scale,  syt = SYT * scale, syv = SYV * scale;
+
+        var placements = new[]
+        {
+            new { n = "Top",         p = V2(  0f,  syt), s = V2(hw, hh) },
+            new { n = "Middle",      p = V2(  0f,   0f), s = V2(hw, hh) },
+            new { n = "Bottom",      p = V2(  0f, -syt), s = V2(hw, hh) },
+            new { n = "TopLeft",     p = V2(-sx,   syv), s = V2(vw, vh) },
+            new { n = "TopRight",    p = V2( sx,   syv), s = V2(vw, vh) },
+            new { n = "BottomLeft",  p = V2(-sx,  -syv), s = V2(vw, vh) },
+            new { n = "BottomRight", p = V2( sx,  -syv), s = V2(vw, vh) },
+        };
+
+        for (int i = 0; i < placements.Length; i++)
+        {
+            var seg = Img(t, placements[i].n, V2(.5f,.5f), V2(.5f,.5f),
+                placements[i].p, placements[i].s, lit[i] ? ACCENT : SEG_OFF);
+            seg.sprite = placements[i].s.x > placements[i].s.y ? HSeg : VSeg;
+            seg.raycastTarget = false;
+        }
+
+        // The numeral underneath, so the shape reads as an answer not a puzzle
+        Txt(t, "lbl_value", value.ToString(), V2(.5f,0), V2(.5f,0),
+            V2(0, -22f), V2(DW * scale, 30f), 22, TEXT_DIM,
+            TextAnchor.MiddleCenter, FontStyle.Bold).raycastTarget = false;
     }
 
     static Digit Digit(Transform p, string name, Vector2 pos)

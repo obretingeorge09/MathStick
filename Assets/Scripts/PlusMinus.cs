@@ -94,10 +94,16 @@ public class PlusMinus : MonoBehaviour
 
         if (line2 != null)
         {
-            // Hidden rather than dimmed when minus: a faint second stick is
-            // exactly what made this read as two separate controls.
-            line2.gameObject.SetActive(isPlus);
+            // Always present, lit only for plus. Hiding it entirely was a
+            // mistake: it made the key look like a minus sign that happened to
+            // be tappable, with no hint that plus was even an option. The
+            // surrounding key frame is what stops the two bars reading as
+            // separate sticks, so the unlit bar can stay — it is the only thing
+            // telling the player what this control can become.
+            line2.gameObject.SetActive(true);
+
             if (isPlus) line2.SetSelected();
+            else        line2.SetActive();   // dim, the way an unlit segment looks
         }
     }
 
