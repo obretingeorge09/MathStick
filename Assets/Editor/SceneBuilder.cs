@@ -996,7 +996,7 @@ public static class SceneBuilder
         scrollRt.anchorMin = V2(0,0); scrollRt.anchorMax = V2(1,1);
         scrollRt.offsetMin = V2(40,120); scrollRt.offsetMax = V2(-40,-210);
         scrollGO.AddComponent<Image>().color = new Color(0,0,0,0.01f);
-        var scrollRect = scrollGO.AddComponent<UnityEngine.UI.ScrollRect>();
+        var scrollRect = TuneScroll(scrollGO.AddComponent<UnityEngine.UI.ScrollRect>());
         scrollRect.horizontal = false;
         scrollGO.AddComponent<Mask>().showMaskGraphic = false;
 
@@ -1059,7 +1059,7 @@ public static class SceneBuilder
         fScrollRt.anchorMin = V2(0,1); fScrollRt.anchorMax = V2(1,1);
         fScrollRt.offsetMin = V2(40,-540); fScrollRt.offsetMax = V2(-40,-250);
         friendScrollGO.AddComponent<Image>().color = new Color(0,0,0,0.01f);
-        var fScrollRect = friendScrollGO.AddComponent<UnityEngine.UI.ScrollRect>();
+        var fScrollRect = TuneScroll(friendScrollGO.AddComponent<UnityEngine.UI.ScrollRect>());
         fScrollRect.horizontal = false;
         friendScrollGO.AddComponent<Mask>().showMaskGraphic = false;
 
@@ -1786,6 +1786,32 @@ public static class SceneBuilder
         a.overrideOnLight = true;
         a.lightThemeColor = onLight;
         return g;
+    }
+
+    /// <summary>
+    /// Makes a ScrollRect behave like a list you can actually move.
+    ///
+    /// ScrollRect ships with scrollSensitivity 1, which moves the content by
+    /// one unit per wheel notch. On a list nearly two thousand pixels long
+    /// that is indistinguishable from not scrolling at all — and the wheel is
+    /// how it gets tested, in the editor, long before a finger touches it.
+    /// </summary>
+    static ScrollRect TuneScroll(ScrollRect sr)
+    {
+        sr.scrollSensitivity = 60f;
+
+        // With no viewport ScrollRect falls back to its own rect. That mostly
+        // works, until a ContentSizeFitter resizes the content mid-layout and
+        // it measures against the wrong thing. Being explicit costs nothing.
+        if (sr.viewport == null) sr.viewport = sr.GetComponent<RectTransform>();
+
+        // A list has ends. Rubber-banding past them suits a page you are
+        // reading, not a menu you are trying to pick a row out of.
+        sr.movementType = ScrollRect.MovementType.Clamped;
+        sr.inertia = true;
+        sr.decelerationRate = 0.135f;
+
+        return sr;
     }
 
     /// <summary>Frame behind a colour swatch, shown only while it is the chosen one.</summary>
@@ -3118,9 +3144,13 @@ public static class SceneBuilder
         scrollRt.offsetMin = V2(60, 80); scrollRt.offsetMax = V2(-60, -220);
         scrollGO.AddComponent<Image>().color = new Color(0,0,0,0.01f);
 
-        var scroll = scrollGO.AddComponent<ScrollRect>();
+        var scroll = TuneScroll(scrollGO.AddComponent<ScrollRect>());
         scroll.horizontal = false;
-        scrollGO.AddComponent<Mask>().showMaskGraphic = false;
+
+        // RectMask2D rather than Mask: it clips by rectangle instead of by
+        // stencil, so it needs no second draw of the graphic and does not
+        // spend a stencil bit the rest of the UI might want.
+        scrollGO.AddComponent<RectMask2D>();
 
         var contentGO = new GameObject("Content");
         contentGO.transform.SetParent(scrollGO.transform, false);
@@ -3134,6 +3164,11 @@ public static class SceneBuilder
         vlg.childForceExpandHeight = false;
         vlg.childControlWidth = true;
         vlg.childControlHeight = false;
+
+        // Twenty rows very nearly fill the panel, so without this the last one
+        // sits flush against the bottom edge and reads as the end of the list
+        // rather than the end of the visible part of it.
+        vlg.padding = new RectOffset(6, 6, 4, 40);
 
         var csf = contentGO.AddComponent<ContentSizeFitter>();
         csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -3537,7 +3572,7 @@ public static class SceneBuilder
         scrollRt.anchorMin = V2(0,0); scrollRt.anchorMax = V2(1,1);
         scrollRt.offsetMin = V2(40,120); scrollRt.offsetMax = V2(-40,-295);
         scrollGO.AddComponent<Image>().color = new Color(0,0,0,0.01f);
-        var scrollRect = scrollGO.AddComponent<ScrollRect>();
+        var scrollRect = TuneScroll(scrollGO.AddComponent<ScrollRect>());
         scrollRect.horizontal = false;
         scrollGO.AddComponent<Mask>().showMaskGraphic = false;
 
