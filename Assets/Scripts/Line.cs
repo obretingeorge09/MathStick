@@ -69,6 +69,13 @@ public class Line : MonoBehaviour, IPointerClickHandler
         Messenger.AddListener(Message.GameWon,      OnGameWon);
         Messenger.AddListener(Message.StartNewGame, OnNewGame);
 
+        // A segment reads its palette from GameSettings, which may not have
+        // woken yet when this runs — Unity does not order Awake across
+        // objects. Without this the board keeps the hardcoded fallback colours
+        // until something restarts the round, and repainting on the theme
+        // signal costs one Image.color write per segment.
+        Messenger.AddListener(Message.OnThemeChanged, ApplyState);
+
         // Glow — blurred larger sprite behind everything for diffuse light emission
         Vector2 glowSize = rt.sizeDelta + new Vector2(GLOW_PAD * 2, GLOW_PAD * 2);
         glow = MakeRect("Glow", Vector2.zero, glowSize, GlowOff);

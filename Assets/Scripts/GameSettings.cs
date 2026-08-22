@@ -106,6 +106,19 @@ public class GameSettings : MonoBehaviour
         bgColorIndex  = Mathf.Clamp(bgColorIndex,  0, BackgroundColors.Length - 1);
     }
 
+    void Start()
+    {
+        // Unity does not order Awake across objects, so a BgAdaptiveTint or a
+        // LocalizedText can wake before this one and find Instance still null.
+        // It then falls back to the colour it was built with — and nothing
+        // corrects it, because the player did not CHANGE the theme, they
+        // arrived with one already saved. That is how a dark translucent card
+        // ended up sitting over a white board as a grey slab.
+        //
+        // Start runs after every Awake, so one broadcast here settles it.
+        Messenger.Broadcast(Message.OnThemeChanged);
+    }
+
     public void SetSegColor(int index)
     {
         segColorIndex = Mathf.Clamp(index, 0, SegmentColors.Length - 1);
