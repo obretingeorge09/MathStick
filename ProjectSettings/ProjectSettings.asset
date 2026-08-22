@@ -154,7 +154,7 @@ PlayerSettings:
   androidSupportedAspectRatio: 1
   androidMaxAspectRatio: 2.4
   applicationIdentifier:
-    Android: com.JOC.PlusMinus
+    Android: com.mystudio.plusminus
     Standalone: com.MyStudio.PlusMinus
     iPhone: com.mystudio.plusminus
   buildNumber:
