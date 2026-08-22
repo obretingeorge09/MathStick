@@ -103,7 +103,7 @@ public class PlayerStatsManager : MonoBehaviour
     public float LevelProgress =>
         XpForThisLevel > 0 ? Mathf.Clamp01((float)XpIntoLevel / XpForThisLevel) : 0f;
 
-    public event Action OnStatsChanged;    public event Action OnStatsChanged;
+    public event Action OnStatsChanged;
 
     // ── Live values ─────────────────────────────────────────────────────
     public int    Elo           { get; private set; } = START_ELO;
