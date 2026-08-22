@@ -38,6 +38,10 @@ public enum Message
     ArcadeRoundEnded,            // round result determined
     ArcadeMatchEnded,            // match finished
     ArcadeOpponentDisconnected,  // opponent lost connection
+
+    // Segment or background colour changed in Settings. Anything that has to
+    // stay readable against the board listens for this.
+    OnThemeChanged,
 }
 
 public enum ReceiveMessage
@@ -248,6 +252,19 @@ static internal class Messenger
 	#endregion
 	
 	#region RemoveListener
+	/// <summary>
+	/// Removes a listener only if the table still knows this event. Teardown
+	/// order is not guaranteed, and MessengerCleaner wipes the whole table in
+	/// its own OnDisable — a component unregistering after that would hit the
+	/// exception RemoveListener throws for an unknown event.
+	/// </summary>
+	static public void TryRemoveListener (Message eventType, Callback handler)
+	{
+		Delegate d;
+		if (eventTable.TryGetValue (eventType, out d) && d != null)
+			RemoveListener (eventType, handler);
+	}
+
 	//No parameters
 	static public void RemoveListener (Message eventType, Callback handler)
 	{

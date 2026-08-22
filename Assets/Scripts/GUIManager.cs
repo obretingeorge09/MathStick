@@ -220,6 +220,10 @@ public class GUIManager : MonoBehaviour
                    : ratio > 0.33f ? ColWarm
                    : ratio > 0.11f ? ColYellow : ColRed;
 
+        // Rewritten every frame, so BgAdaptiveTint cannot own these two — the
+        // countdown colour has to come down to the board itself.
+        if (GameSettings.Instance != null) tint = GameSettings.Instance.OnBackground(tint);
+
         if (timerBarFill != null)
         {
             if (timerBarFill.gameObject.activeSelf == unlimited)
@@ -617,6 +621,9 @@ public class GUIManager : MonoBehaviour
         if (gameBG && GameSettings.Instance != null)
             gameBG.color = GameSettings.Instance.SelectedBgColor;
     }
+
+    void OnEnable()  { Messenger.AddListener(Message.OnThemeChanged, ApplyBgColor); }
+    void OnDisable() { Messenger.TryRemoveListener(Message.OnThemeChanged, ApplyBgColor); }
 
     // Audio is owned by VolumeControl now — it manages the corner key, the
     // level readout and the stepped popover. These remain so any older wiring

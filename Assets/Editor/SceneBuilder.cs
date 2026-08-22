@@ -164,10 +164,16 @@ public static class SceneBuilder
         Img(st, "StartBG", V2(0,0), V2(1,1), V2(0,0), V2(0,0), Hex("#080C16")).raycastTarget = false;
 
         // ── Title — digital segment letters ─────────────────────────────
-        DigTxt(st, "lbl_title_glow", "MATHSTICK", V2(.5f,1), V2(.5f,1), V2(2,-398), V2(900,210), 140, Hex("#F59E0B10")).raycastTarget = false;
-        DigTxt(st, "lbl_title_main", "MATHSTICK", V2(.5f,1), V2(.5f,1), V2(0,-396), V2(900,210), 140, ACCENT).raycastTarget = false;
-        DigTxt(st, "lbl_title2_glow", "PUZZLE", V2(.5f,1), V2(.5f,1), V2(2,-558), V2(900,165), 110, Hex("#F59E0B10")).raycastTarget = false;
-        DigTxt(st, "lbl_title2_main", "PUZZLE", V2(.5f,1), V2(.5f,1), V2(0,-556), V2(900,165), 110, ACCENT).raycastTarget = false;
+        // Nine segment glyphs at 140px overrun a 900px box, and Text wraps by
+        // default with vertical overflow truncated — so the K went to a second
+        // line and was clipped away, leaving MATHSTIC. Best-fit shrinks the
+        // word to whatever the box holds instead of losing a letter, and both
+        // copies of each word must carry identical settings or the glow slides
+        // off the letters it is meant to sit behind.
+        Fit(DigTxt(st, "lbl_title_glow", "MATHSTICK", V2(.5f,1), V2(.5f,1), V2(2,-398), V2(938,210), 140, Hex("#F59E0B10")), 140, 70);
+        Fit(DigTxt(st, "lbl_title_main", "MATHSTICK", V2(.5f,1), V2(.5f,1), V2(0,-396), V2(938,210), 140, ACCENT), 140, 70);
+        Fit(DigTxt(st, "lbl_title2_glow", "PUZZLE", V2(.5f,1), V2(.5f,1), V2(2,-558), V2(938,165), 110, Hex("#F59E0B10")), 110, 55);
+        Fit(DigTxt(st, "lbl_title2_main", "PUZZLE", V2(.5f,1), V2(.5f,1), V2(0,-556), V2(938,165), 110, ACCENT), 110, 55);
 
         // Decorative segment-bar under title
         Img(st, "TitleSeg", V2(.5f,1), V2(.5f,1), V2(0,-630), V2(160, 4), Hex("#F59E0B30")).raycastTarget = false;
@@ -431,21 +437,28 @@ public static class SceneBuilder
         // Warm dark-gold background for game levels
         Img(mt, "GameBG", V2(0,0), V2(1,1), V2(0,0), V2(0,0), Hex("#141208")).raycastTarget = false;
 
+        // Everything from here down sits ON GameBG, and GameBG can now be
+        // paper or mint. Adapt() makes each piece follow it — without that the
+        // whole header stays the bright amber it was designed in, which on an
+        // off-white board is not readable text.
+
         // ── Header bar (minimalist) ──────────────────────────────────────
-        Img(mt, "HeaderLine", V2(0,1), V2(1,1), V2(0,-110), V2(0,3), Hex("#F59E0B15")).raycastTarget = false;
+        Adapt(Img(mt, "HeaderLine", V2(0,1), V2(1,1), V2(0,-110), V2(0,3), Hex("#F59E0B15")), Hex("#00000018")).raycastTarget = false;
 
         // Best score — top left. DigTxt centres by default, so a 900-wide rect
         // used to centre "BEST" on x=60 and print it straight over the digits.
-        DigTxt(mt, "lbl_best_label", "BEST", V2(0,1), V2(0,1), V2(160,-138), V2(200,33), 22, TEXT_MUTED,
-            TextAnchor.MiddleLeft).raycastTarget = false;
+        Adapt(DigTxt(mt, "lbl_best_label", "BEST", V2(0,1), V2(0,1), V2(160,-138), V2(200,33), 22, TEXT_MUTED,
+            TextAnchor.MiddleLeft)).raycastTarget = false;
         var lblHS = Txt(mt, "lbl_highscore", "0",
             V2(0,1), V2(0,1), V2(150,-192), V2(180,60), 52, ACCENT_LIGHT,
             TextAnchor.MiddleLeft, FontStyle.Bold);
+        Adapt(lblHS);
 
         // ── Timer section ────────────────────────────────────────────────
         // Pushed below the score row, which owns y 125..185
         var lblTimeLabel = DigTxt(mt, "lbl_time_label", "TIME REMAINING", V2(.5f,1), V2(.5f,1), V2(0,-248), V2(460,24), 16, TEXT_MUTED);
         lblTimeLabel.raycastTarget = false;
+        Adapt(lblTimeLabel);
 
         var lblTimer = Txt(mt, "lbl_timer", "90:00",
             V2(.5f,1), V2(.5f,1), V2(0,-306), V2(460,70), 58, TEXT_PRIMARY,
@@ -454,6 +467,7 @@ public static class SceneBuilder
         // Timer bar with rounded ends
         var timerBarBg = RoundImg(mt, "timer_bar_bg", V2(.5f,1), V2(.5f,1), V2(0,-354), V2(860,10), TIMER_BG);
         timerBarBg.raycastTarget = false;
+        Adapt(timerBarBg, Hex("#00000018"));
         var barFill = RoundImg(mt, "timer_bar_fill", V2(.5f,1), V2(.5f,1), V2(0,-354), V2(860,10), ACCENT);
         barFill.type = Image.Type.Filled;
         barFill.fillMethod = Image.FillMethod.Horizontal;
@@ -461,7 +475,10 @@ public static class SceneBuilder
         barFill.raycastTarget = false;
 
         // ── Equation container ───────────────────────────────────────────
+        // A translucent dark card over paper would just be a grey board, so on
+        // a light theme it flips to a soft white one instead of darkening.
         var eqBg = RoundImg(mt, "EqBG", V2(.5f,.5f), V2(.5f,.5f), V2(0, -110), V2(880,960), Hex("#0F172A80"));
+        Adapt(eqBg, Hex("#FFFFFF5C"));
         eqBg.raycastTarget = false;
 
         var eqGO = Panel(mt, "Equation", V2(.5f,.5f), V2(.5f,.5f), V2(0,-110), V2(860,940));
@@ -485,6 +502,7 @@ public static class SceneBuilder
         // Equals sign for landscape (hidden in portrait)
         var eqSign = Txt(eq, "lbl_equals", "=", V2(.5f,.5f), V2(.5f,.5f), V2(0,0), V2(60,80), 60, ACCENT,
             TextAnchor.MiddleCenter, FontStyle.Bold);
+        Adapt(eqSign);
         eqSign.gameObject.SetActive(false);
 
         // EquationLayout for Easy mode
@@ -533,6 +551,7 @@ public static class SceneBuilder
         // Equals sign for landscape (hidden in portrait)
         var eqSign3 = Txt(eq3, "lbl_equals3", "=", V2(.5f,.5f), V2(.5f,.5f), V2(0,0), V2(60,80), 60, ACCENT,
             TextAnchor.MiddleCenter, FontStyle.Bold);
+        Adapt(eqSign3);
         eqSign3.gameObject.SetActive(false);
 
         // EquationLayout for Medium mode
@@ -588,6 +607,7 @@ public static class SceneBuilder
         // Equals sign for landscape (hidden in portrait)
         var eqSignH = Txt(eqH, "lbl_equalsH", "=", V2(.5f,.5f), V2(.5f,.5f), V2(0,0), V2(60,80), 60, ACCENT,
             TextAnchor.MiddleCenter, FontStyle.Bold);
+        Adapt(eqSignH);
         eqSignH.gameObject.SetActive(false);
 
         // EquationLayout for Hard mode
@@ -619,7 +639,7 @@ public static class SceneBuilder
         // Hint with icon-like styling
         var hintBg = RoundImg(mt, "HintBG", V2(.5f,0), V2(.5f,0), V2(0,110), V2(780,60), Hex("#1E293B60"));
         hintBg.raycastTarget = false;
-        DigTxt(mt, "lbl_hint", "TAP STICKS - BUILD DIGITS", V2(.5f,0), V2(.5f,0), V2(0,112), V2(900,21), 14, TEXT_MUTED).raycastTarget = false;
+        Adapt(DigTxt(mt, "lbl_hint", "TAP STICKS - BUILD DIGITS", V2(.5f,0), V2(.5f,0), V2(0,112), V2(900,21), 14, TEXT_MUTED)).raycastTarget = false;
 
         pnlMain.SetActive(false);
 
@@ -1658,6 +1678,52 @@ public static class SceneBuilder
         sel.gloss = face.Find("btn_gloss").GetComponent<Image>();
         sel.label = face.Find("lbl_btn").GetComponent<Text>();
         return sel;
+    }
+
+    /// <summary>
+    /// Lets a label shrink to fit its box rather than wrap and lose the tail.
+    /// Both copies of a glowing title must be given the same numbers or the
+    /// glow and the word settle at different sizes.
+    /// </summary>
+    static Text Fit(Text t, int max, int min)
+    {
+        t.raycastTarget = false;
+        t.horizontalOverflow = HorizontalWrapMode.Wrap;
+        t.verticalOverflow = VerticalWrapMode.Truncate;
+        t.resizeTextForBestFit = true;
+        t.resizeTextMaxSize = max;
+        t.resizeTextMinSize = min;
+        return t;
+    }
+
+    /// <summary>
+    /// Marks a graphic drawn over the game board so it re-tints when the board
+    /// does. Derives the light-theme colour by darkening what it already has.
+    /// </summary>
+    static T Adapt<T>(T g) where T : Graphic
+    {
+        var a = g.gameObject.AddComponent<BgAdaptiveTint>();
+        a.darkThemeColor = g.color;
+        return g;
+    }
+
+    /// <summary>As Adapt, but the light-theme colour is given rather than derived.</summary>
+    static T Adapt<T>(T g, Color onLight) where T : Graphic
+    {
+        var a = g.gameObject.AddComponent<BgAdaptiveTint>();
+        a.darkThemeColor = g.color;
+        a.overrideOnLight = true;
+        a.lightThemeColor = onLight;
+        return g;
+    }
+
+    /// <summary>Frame behind a colour swatch, shown only while it is the chosen one.</summary>
+    static Image SwatchRing(Transform swatch)
+    {
+        var ring = Shape(swatch, "swatch_ring", RoundRect, Vector2.zero, V2(12, 12), ACCENT);
+        ring.raycastTarget = false;
+        ring.enabled = false;          // SettingsColorPicker turns it on
+        return ring;
     }
 
     /// <summary>Sliced rounded image stretched to its parent, offset by pos.</summary>
@@ -2785,6 +2851,8 @@ public static class SceneBuilder
             srt.anchoredPosition = V2(x, y);
             srt.sizeDelta = V2(swatchSize, swatchSize);
 
+            var ring = SwatchRing(swatch.transform);
+
             var sImg = swatch.AddComponent<Image>();
             sImg.sprite = RoundRect;
             sImg.type = Image.Type.Sliced;
@@ -2801,17 +2869,23 @@ public static class SceneBuilder
             var picker = swatch.AddComponent<SettingsColorPicker>();
             picker.colorType = 0; // segment
             picker.colorIndex = i;
+            picker.ring = ring;
         }
 
         // ── BACKGROUND COLOR section ─────────────────────────────────
         DigTxt(st, "lbl_bg_title", "BACKGROUND COLOR", V2(.5f,1), V2(.5f,1), V2(0,-530), V2(900,36), 24, TEXT_PRIMARY).raycastTarget = false;
+
+        // The two rows are two different kinds of board, not eight variations
+        // of one, so each says which it is.
+        DigTxt(st, "lbl_bg_dark",  "DARK",  V2(.5f,1), V2(.5f,1), V2(0,-566), V2(900,20), 13, TEXT_MUTED).raycastTarget = false;
+        DigTxt(st, "lbl_bg_light", "LIGHT", V2(.5f,1), V2(.5f,1), V2(0,-700), V2(900,20), 13, TEXT_MUTED).raycastTarget = false;
 
         for (int i = 0; i < 8; i++)
         {
             int row = i / 4;
             int col = i % 4;
             float x = startX + col * (swatchSize + gap);
-            float y = -600f - row * (swatchSize + gap + 10);
+            float y = -624f - row * 134f;
 
             var swatch = new GameObject("swatch_bg_" + i);
             swatch.transform.SetParent(st, false);
@@ -2820,15 +2894,24 @@ public static class SceneBuilder
             srt.anchoredPosition = V2(x, y);
             srt.sizeDelta = V2(swatchSize, swatchSize);
 
+            // Selection frame, drawn behind and slightly proud of the swatch.
+            // Toggled by SettingsColorPicker.
+            var ring = SwatchRing(swatch.transform);
+
             var sImg = swatch.AddComponent<Image>();
             sImg.sprite = RoundRect;
             sImg.type = Image.Type.Sliced;
-            // Show bg colors brighter for visibility
-            Color bgC = GameSettings.BackgroundColors[i];
-            sImg.color = new Color(
-                Mathf.Max(bgC.r, 0.08f) * 3f,
-                Mathf.Max(bgC.g, 0.08f) * 3f,
-                Mathf.Max(bgC.b, 0.08f) * 3f, 1f);
+
+            // The real colour. These used to be drawn three times brighter "for
+            // visibility", which meant the swatch never showed the board you
+            // were choosing — and with light options in the table it would just
+            // clip them all to white. A hairline keeps the dark ones findable
+            // against the panel instead.
+            sImg.color = GameSettings.BackgroundColors[i];
+
+            var edge = Shape(swatch.transform, "swatch_edge", RoundRect, Vector2.zero, V2(2,2), Hex("#FFFFFF22"));
+            edge.raycastTarget = false;
+            edge.transform.SetAsFirstSibling();
 
             var sBtn = swatch.AddComponent<Button>();
             sBtn.targetGraphic = sImg;
@@ -2839,6 +2922,7 @@ public static class SceneBuilder
             var picker = swatch.AddComponent<SettingsColorPicker>();
             picker.colorType = 1; // background
             picker.colorIndex = i;
+            picker.ring = ring;
         }
 
         // ── AUDIO section ────────────────────────────────────────────
@@ -2850,11 +2934,11 @@ public static class SceneBuilder
         // pnl_settings carries ScrollablePanel, so every child must be TOP
         // anchored; anything centred would resolve against the fixed 1920
         // content box instead of the screen.
-        DigTxt(st, "lbl_audio_title", "AUDIO", V2(.5f,1), V2(.5f,1), V2(0,-800), V2(900,36), 24, TEXT_PRIMARY)
+        DigTxt(st, "lbl_audio_title", "AUDIO", V2(.5f,1), V2(.5f,1), V2(0,-880), V2(900,36), 24, TEXT_PRIMARY)
             .raycastTarget = false;
 
-        AudioSliderRow(st, "row_music", "MUSIC", -870, AudioSliderBinder.Channel.Music);
-        AudioSliderRow(st, "row_sfx",   "EFFECTS", -960, AudioSliderBinder.Channel.SFX);
+        AudioSliderRow(st, "row_music", "MUSIC", -950, AudioSliderBinder.Channel.Music);
+        AudioSliderRow(st, "row_sfx",   "EFFECTS", -1040, AudioSliderBinder.Channel.SFX);
 
         // Back arrow
         var btnBack = BackArrowButton(st, "btn_settings_back", V2(0,1), V2(0,1), V2(70, -70), 80, ACCENT_DARK);
