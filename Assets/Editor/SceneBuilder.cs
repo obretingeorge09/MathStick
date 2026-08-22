@@ -100,12 +100,50 @@ public static class SceneBuilder
     static Sprite s_vSeg;   // vertical segment (pointed top/bottom ends)
     static Sprite VSeg => s_vSeg != null ? s_vSeg : (s_vSeg = MakeBeveledSeg(32, 128, false));
 
+    // Survives the domain reload that exiting Play mode triggers, which plain
+    // statics and playModeStateChanged subscriptions do not. Cleared when the
+    // editor closes.
+    const string PENDING_BUILD = "PlusMinus.BuildAfterPlayModeStops";
+
     [MenuItem("PlusMinus/Build Scene")]
     public static void Build()
     {
         if (EditorApplication.isPlaying)
-        { Debug.LogError("Stop Play mode first!"); return; }
+        {
+            // This used to just refuse and say "Stop Play mode first!", which
+            // is a message you read twice: once to learn the rule, once
+            // because you forgot it. Rebuilding really cannot happen under
+            // Play mode — it would delete the objects the running game is
+            // holding, and Unity restores the pre-play scene on exit, so the
+            // work would be thrown away either way. So stop Play mode here and
+            // build once it has, instead of handing the job back.
+            Debug.Log("PlusMinus: leaving Play mode, then building the scene.");
+            SessionState.SetBool(PENDING_BUILD, true);
+            EditorApplication.isPlaying = false;
+            return;
+        }
 
+        BuildNow();
+    }
+
+    /// <summary>Runs after the domain reload that follows leaving Play mode.</summary>
+    [InitializeOnLoadMethod]
+    static void ResumePendingBuild()
+    {
+        if (!SessionState.GetBool(PENDING_BUILD, false)) return;
+
+        // This also fires on the way INTO Play mode; only the way out counts.
+        if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+
+        SessionState.SetBool(PENDING_BUILD, false);
+
+        // Deferred: Unity is still finishing the teardown at this point, and
+        // NewScene during it leaves the hierarchy half torn down.
+        EditorApplication.delayCall += BuildNow;
+    }
+
+    static void BuildNow()
+    {
         EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
         // EventSystem
