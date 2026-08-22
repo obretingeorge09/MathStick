@@ -128,12 +128,21 @@ public class BotMatchManager : MonoBehaviour
     {
         switch (mode)
         {
-            case GameMode.Easy:   return 30f;
-            case GameMode.Medium: return 45f;
-            case GameMode.Hard:   return 60f;
-            default:              return 30f;
+            case GameMode.Easy:   return 45f;
+            case GameMode.Medium: return 65f;
+            case GameMode.Hard:   return 85f;
+            default:              return 45f;
         }
     }
+
+    /// <summary>
+    /// However fast the bot is, it never answers before this. A round decided
+    /// while the player is still reading the board is not a round they lost.
+    /// </summary>
+    const float MIN_SOLVE_SECONDS = 11f;
+
+    /// <summary>How much of a lead the bot gives back per round it is ahead.</summary>
+    const float CATCH_UP_PER_ROUND = 0.18f;
 
     /// <summary>
     /// How long the bot "thinks" this round. Rounds have no time limit any
@@ -144,11 +153,23 @@ public class BotMatchManager : MonoBehaviour
     {
         float nominal = NominalFor(matchMode);
 
-        float fastest = nominal * 0.30f;
-        float slowest = nominal * 1.15f;
+        // Re-rolled every round. The skill was drawn once per match, so a fast draw
+        // stayed fast for every round of it — the player did not lose some
+        // rounds, they lost all of that match.
+        float skill = botSkill + UnityEngine.Random.Range(-0.14f, 0.14f);
 
-        float t = Mathf.Lerp(slowest, fastest, botSkill);
-        return t * UnityEngine.Random.Range(0.8f, 1.2f);
+        // A bot that is ahead eases off, one that is behind presses. Without
+        // this a match settled in the first round stays settled, which is the
+        // shape that makes a fallback opponent feel like a wall.
+        skill -= (botScore - myScore) * CATCH_UP_PER_ROUND;
+
+        skill = Mathf.Clamp(skill, 0.02f, 0.95f);
+
+        float fastest = nominal * 0.45f;
+        float slowest = nominal * 1.60f;
+
+        float t = Mathf.Lerp(slowest, fastest, skill) * UnityEngine.Random.Range(0.9f, 1.15f);
+        return Mathf.Max(t, MIN_SOLVE_SECONDS);
     }
 
     // ═══════════════════════════════════════════════════════════════════

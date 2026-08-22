@@ -254,21 +254,21 @@ public class GUIManager : MonoBehaviour
                 if (lbl_inARow)    lbl_inARow.text    = streak + " IN A ROW!";
                 if (lbl_bestScore) lbl_bestScore.text  = "PERSONAL BEST: " + best;
                 if (lbl_correctAnswer) lbl_correctAnswer.gameObject.SetActive(false);
-                if (lbl_btnText)   lbl_btnText.text    = "CONTINUE";
+                if (lbl_btnText)   lbl_btnText.text = Loc.T("CONTINUE");
 
                 Messenger.Broadcast<float, string>(Message.OnStartFadeToTransparent,
                     0.2f, "fadeToTransparentAfterGameWon");
             }
             else
             {
-                if (lbl_inARow)    lbl_inARow.text    = "STREAK LOST";
+                if (lbl_inARow)    lbl_inARow.text = Loc.T("STREAK LOST");
                 if (lbl_bestScore) lbl_bestScore.text  = "PERSONAL BEST: " + best;
                 if (lbl_correctAnswer)
                 {
                     lbl_correctAnswer.gameObject.SetActive(true);
                     lbl_correctAnswer.text = GameManager.Instance.correctSolution;
                 }
-                if (lbl_btnText)   lbl_btnText.text    = "TRY AGAIN";
+                if (lbl_btnText)   lbl_btnText.text = Loc.T("TRY AGAIN");
 
                 Messenger.Broadcast(Message.OnResetProgress);
                 Messenger.Broadcast<float, string>(Message.OnStartFadeToTransparent,
@@ -300,7 +300,7 @@ public class GUIManager : MonoBehaviour
     // ── Win / Lose ─────────────────────────────────────────────────────────
     void GameWon()
     {
-        if (lbl_result != null) lbl_result.text = "WELL DONE!";
+        if (lbl_result != null) lbl_result.text = Loc.T("WELL DONE!");
         Color c = Messenger.BroadcastReceiver<Color>(ReceiveMessage.ReceiveWinGUIColor);
         pnl_continue.GetComponent<Image>().color = c;
         Messenger.Broadcast<float, string>(Message.OnStartFadeToOpaque, 0.2f, "fadeToOpaqueAfterGameWon");
@@ -308,7 +308,7 @@ public class GUIManager : MonoBehaviour
 
     void OnGameLost()
     {
-        if (lbl_result != null) lbl_result.text = "TIME'S UP!";
+        if (lbl_result != null) lbl_result.text = Loc.T("TIME'S UP!");
         Color c = Messenger.BroadcastReceiver<Color>(ReceiveMessage.ReceiveLoseGUIColor);
         pnl_continue.GetComponent<Image>().color = c;
         Messenger.Broadcast<float, string>(Message.OnStartFadeToOpaque, 0.2f, "fadeToOpaqueAfterGameLost");
@@ -341,6 +341,7 @@ public class GUIManager : MonoBehaviour
         if (pnl_tutorial) pnl_tutorial.SetActive(false);
         if (pnl_forgotPassword) pnl_forgotPassword.SetActive(false);
         if (pnl_settings) pnl_settings.SetActive(false);
+        if (pnl_language) pnl_language.SetActive(false);
         ArcadeGUIManager.Instance?.HideAllPanels();
         ProgressionGUIManager.Instance?.HideAll();
     }
@@ -412,12 +413,12 @@ public class GUIManager : MonoBehaviour
             hasError = true;
         }
         if (hasError) {
-            if (lbl_login_error) lbl_login_error.text = "Please fill in all fields";
+            if (lbl_login_error) lbl_login_error.text = Loc.T("Please fill in all fields");
             return;
         }
         if (!email.Contains("@")) {
             HighlightField(inp_email, true);
-            if (lbl_login_error) lbl_login_error.text = "Invalid email format";
+            if (lbl_login_error) lbl_login_error.text = Loc.T("Invalid email format");
             return;
         }
 
@@ -471,11 +472,11 @@ public class GUIManager : MonoBehaviour
             return;
         }
         if (!email.Contains("@")) {
-            if (lbl_forgot_status) lbl_forgot_status.text = "Invalid email format";
+            if (lbl_forgot_status) lbl_forgot_status.text = Loc.T("Invalid email format");
             return;
         }
 
-        if (lbl_forgot_status) lbl_forgot_status.text = "SENDING...";
+        if (lbl_forgot_status) lbl_forgot_status.text = Loc.T("SENDING...");
         AuthManager.Instance.OnLoginFailed += OnForgotPasswordResult;
         AuthManager.Instance.ResetPassword(email);
     }
@@ -490,12 +491,12 @@ public class GUIManager : MonoBehaviour
                 if (lower.Contains("sent") || lower.Contains("check") || lower.Contains("success"))
                 {
                     lbl_forgot_status.color = new Color(0.46f, 1f, 0.01f);
-                    lbl_forgot_status.text = "Reset link sent! Check your email.";
+                    lbl_forgot_status.text = Loc.T("Reset link sent! Check your email.");
                 }
                 else if (lower.Contains("no user") || lower.Contains("not found") || lower.Contains("no account") || lower.Contains("user-not-found") || lower.Contains("doesn't exist") || lower.Contains("does not exist") || lower.Contains("sign up"))
                 {
                     lbl_forgot_status.color = new Color(1f, 0.4f, 0.4f);
-                    lbl_forgot_status.text = "No account found for this email.\nPlease create an account.";
+                    lbl_forgot_status.text = Loc.T("No account found for this email.\nPlease create an account.");
                 }
                 else
                 {
@@ -522,31 +523,31 @@ public class GUIManager : MonoBehaviour
         string confPass = inp_reg_confirm_pass?.text ?? "";
 
         if (string.IsNullOrEmpty(name)) {
-            if (lbl_login_error) lbl_login_error.text = "Username is required";
+            if (lbl_login_error) lbl_login_error.text = Loc.T("Username is required");
             return;
         }
         if (string.IsNullOrEmpty(email)) {
-            if (lbl_login_error) lbl_login_error.text = "Email is required";
+            if (lbl_login_error) lbl_login_error.text = Loc.T("Email is required");
             return;
         }
         if (string.IsNullOrEmpty(pass)) {
-            if (lbl_login_error) lbl_login_error.text = "Password is required";
+            if (lbl_login_error) lbl_login_error.text = Loc.T("Password is required");
             return;
         }
         if (string.IsNullOrEmpty(confPass)) {
-            if (lbl_login_error) lbl_login_error.text = "Confirm password is required";
+            if (lbl_login_error) lbl_login_error.text = Loc.T("Confirm password is required");
             return;
         }
         if (!email.Contains("@")) {
-            if (lbl_login_error) lbl_login_error.text = "Invalid email format";
+            if (lbl_login_error) lbl_login_error.text = Loc.T("Invalid email format");
             return;
         }
         if (pass.Length < 6) {
-            if (lbl_login_error) lbl_login_error.text = "Password must be at least 6 characters";
+            if (lbl_login_error) lbl_login_error.text = Loc.T("Password must be at least 6 characters");
             return;
         }
         if (pass != confPass) {
-            if (lbl_login_error) lbl_login_error.text = "Passwords don't match";
+            if (lbl_login_error) lbl_login_error.text = Loc.T("Passwords don't match");
             return;
         }
 
@@ -593,7 +594,7 @@ public class GUIManager : MonoBehaviour
     // ── Guest Login ────────────────────────────────────────────────────
     public void OnGuestLoginPressed()
     {
-        if (lbl_login_error) { lbl_login_error.color = new Color(0.5f, 1f, 0.5f); lbl_login_error.text = "Connecting..."; }
+        if (lbl_login_error) { lbl_login_error.color = new Color(0.5f, 1f, 0.5f); lbl_login_error.text = Loc.T("Connecting..."); }
         AuthManager.Instance.OnLoginSuccess += OnLoginSuccess;
         AuthManager.Instance.OnLoginFailed  += OnSocialLoginError;
         AuthManager.Instance.LoginAsGuest();
@@ -612,6 +613,23 @@ public class GUIManager : MonoBehaviour
     {
         HideAllPanels();
         Show(pnl_start, true);
+    }
+
+    // ── Language ────────────────────────────────────────────────────────
+    // Twenty entries do not fit under the audio sliders, so the picker is its
+    // own screen reached from Settings — the same shape other titles use.
+    public GameObject pnl_language = null;
+
+    public void OnLanguagePressed()
+    {
+        HideAllPanels();
+        Show(pnl_language, true);
+    }
+
+    public void OnLanguageBackPressed()
+    {
+        HideAllPanels();
+        Show(pnl_settings, true);
     }
 
     public Image gameBG = null;

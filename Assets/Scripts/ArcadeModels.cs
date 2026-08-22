@@ -21,8 +21,15 @@ public static class MatchLength
     /// <summary>Falls back here when a match or invite arrives without the field.</summary>
     public static int DefaultFirstTo => WinsFor(DEFAULT_ROUNDS);
 
+    /// <summary>
+    /// Composed from a count and a noun rather than translated as a sentence.
+    /// "BEST OF 3" cannot be assembled that way — Chinese renders the idea as
+    /// 五局三胜制, which carries its own numbers, so pasting a 3 in front of a
+    /// translation of "BEST OF" produces nonsense in several languages.
+    /// </summary>
     public static string Label(int wins) =>
-        wins <= 1 ? "SINGLE ROUND" : "BEST OF " + RoundsFor(wins);
+        wins <= 1 ? Loc.T("SINGLE ROUND")
+                  : RoundsFor(wins) + " " + Loc.T("ROUNDS");
 }
 
 [Serializable]

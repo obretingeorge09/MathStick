@@ -150,7 +150,7 @@ public class ProgressionGUIManager : MonoBehaviour
         if (stats == null) return;
 
         if (lbl_prof_name != null)
-            lbl_prof_name.text = (AuthManager.Instance?.DisplayName ?? "PLAYER").ToUpper();
+            lbl_prof_name.text = (AuthManager.Instance?.DisplayName ?? Loc.T("PLAYER")).ToUpper();
 
         if (lbl_prof_rank != null)
         {
@@ -217,12 +217,12 @@ public class ProgressionGUIManager : MonoBehaviour
             lbl_lb_month.text = "SEASON " + month;
         }
 
-        if (lbl_lb_status != null) lbl_lb_status.text = "LOADING...";
+        if (lbl_lb_status != null) lbl_lb_status.text = Loc.T("LOADING...");
 
         var mgr = LeaderboardManager.Instance;
         if (mgr == null)
         {
-            if (lbl_lb_status != null) lbl_lb_status.text = "UNAVAILABLE";
+            if (lbl_lb_status != null) lbl_lb_status.text = Loc.T("UNAVAILABLE");
             return;
         }
 
@@ -362,7 +362,7 @@ public class ProgressionGUIManager : MonoBehaviour
                 }
                 else
                 {
-                    lbl_claim_streak.text = "COME BACK TOMORROW";
+                    lbl_claim_streak.text = Loc.T("COME BACK TOMORROW");
                     lbl_claim_streak.color = DIM;
                 }
             }
@@ -405,12 +405,12 @@ public class ProgressionGUIManager : MonoBehaviour
         {
             if (c.claimed)
             {
-                lblReward.text = "DONE";
+                lblReward.text = Loc.T("DONE");
                 lblReward.color = DIM;
             }
             else if (c.Completed)
             {
-                lblReward.text = "CLAIM";
+                lblReward.text = Loc.T("CLAIM");
                 lblReward.color = new Color(0.46f, 1f, 0.01f);
             }
             else

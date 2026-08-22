@@ -98,7 +98,7 @@ public class TutorialAnimator : MonoBehaviour
             if (lblCongrats)
             {
                 lblCongrats.gameObject.SetActive(true);
-                lblCongrats.text = "CORRECT!";
+                lblCongrats.text = Loc.T("CORRECT!");
             }
 
             // Flash all active segments

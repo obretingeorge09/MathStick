@@ -193,13 +193,14 @@ public class ArcadeGUIManager : MonoBehaviour
     void UpdateModeSelectUI()
     {
         if (lbl_modeSelectTitle != null)
-            lbl_modeSelectTitle.text = selectedMode.ToString().ToUpper() + "  ·  " +
+            lbl_modeSelectTitle.text = Loc.T(selectedMode.ToString().ToUpper()) + "  ·  " +
                                        MatchLength.Label(selectedFirstTo);
 
         if (lbl_roundsRule != null)
             lbl_roundsRule.text = selectedRounds <= 1
-                ? "ONE ROUND  ·  WINNER TAKES THE MATCH"
-                : selectedRounds + " ROUNDS  ·  FIRST TO " + selectedFirstTo + " WINS";
+                ? Loc.T("ONE ROUND  ·  WINNER TAKES THE MATCH")
+                : selectedRounds + " " + Loc.T("ROUNDS") + "  ·  " +
+                  selectedFirstTo + " " + Loc.T("WINS");
 
         // Without this the panel never showed which key was chosen, so the
         // ones built dim looked broken however often they were tapped.
@@ -222,7 +223,7 @@ public class ArcadeGUIManager : MonoBehaviour
 
         HideAllArcadePanels();
         Show(pnl_arcadeWaiting, true);
-        if (lbl_waitingStatus != null) lbl_waitingStatus.text = "SEARCHING...";
+        if (lbl_waitingStatus != null) lbl_waitingStatus.text = Loc.T("SEARCHING...");
 
         LobbyManager.Instance?.EnterRandomQueue(selectedMode, selectedFirstTo);
     }
@@ -411,7 +412,7 @@ public class ArcadeGUIManager : MonoBehaviour
 
         HideAllArcadePanels();
         Show(pnl_arcadeWaiting, true);
-        if (lbl_waitingStatus != null) lbl_waitingStatus.text = "WAITING FOR RESPONSE...";
+        if (lbl_waitingStatus != null) lbl_waitingStatus.text = Loc.T("WAITING FOR RESPONSE...");
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -489,7 +490,7 @@ public class ArcadeGUIManager : MonoBehaviour
         var ads = AdManager.Instance;
         if (ads == null || !ads.IsRewardedReady) return;
 
-        if (lbl_watchAd != null) lbl_watchAd.text = "LOADING...";
+        if (lbl_watchAd != null) lbl_watchAd.text = Loc.T("LOADING...");
 
         ads.ShowRewarded(watched =>
         {
@@ -532,7 +533,7 @@ public class ArcadeGUIManager : MonoBehaviour
 
         if (lbl_inviteFrom != null) lbl_inviteFrom.text = invite.fromName;
         if (lbl_inviteMode != null)
-            lbl_inviteMode.text = invite.mode.ToString().ToUpper() + "  ·  " + MatchLength.Label(invite.firstTo);
+            lbl_inviteMode.text = Loc.T(invite.mode.ToString().ToUpper()) + "  ·  " + MatchLength.Label(invite.firstTo);
     }
 
     public void OnAcceptInvitePressed()
@@ -556,7 +557,7 @@ public class ArcadeGUIManager : MonoBehaviour
     void OnInviteDeclined()
     {
         RefundEntry();
-        if (lbl_waitingStatus != null) lbl_waitingStatus.text = "INVITE DECLINED";
+        if (lbl_waitingStatus != null) lbl_waitingStatus.text = Loc.T("INVITE DECLINED");
         StartCoroutine(ReturnToModeSelectAfterDelay(2f));
     }
 
@@ -572,7 +573,7 @@ public class ArcadeGUIManager : MonoBehaviour
 
         HideAllArcadePanels();
         Show(pnl_arcadeWaiting, true);
-        if (lbl_waitingStatus != null) lbl_waitingStatus.text = "JOINING MATCH...";
+        if (lbl_waitingStatus != null) lbl_waitingStatus.text = Loc.T("JOINING MATCH...");
 
         // Stop lobby listeners
         LobbyManager.Instance?.StopListeningOnlineUsers();
@@ -589,7 +590,7 @@ public class ArcadeGUIManager : MonoBehaviour
     {
         if (BotMatchManager.Instance == null)
         {
-            ShowError("No opponents available");
+            ShowError(Loc.T("No opponents available"));
             StartCoroutine(ReturnToModeSelectAfterDelay(2f));
             return;
         }
@@ -600,7 +601,7 @@ public class ArcadeGUIManager : MonoBehaviour
 
         HideAllArcadePanels();
         Show(pnl_arcadeWaiting, true);
-        if (lbl_waitingStatus != null) lbl_waitingStatus.text = "OPPONENT FOUND!";
+        if (lbl_waitingStatus != null) lbl_waitingStatus.text = Loc.T("OPPONENT FOUND!");
 
         LobbyManager.Instance?.StopListeningOnlineUsers();
 
@@ -638,8 +639,8 @@ public class ArcadeGUIManager : MonoBehaviour
         if (lbl_roundInfo != null)
             lbl_roundInfo.text = CurFirstTo <= 1
                 ? "ONE ROUND"
-                : "ROUND " + CurRound + " OF " + MatchLength.RoundsFor(CurFirstTo);
-        if (lbl_oppName != null) lbl_oppName.text = CurOppName?.ToUpper() ?? "OPPONENT";
+                : Loc.T("ROUND") + " " + CurRound + " / " + MatchLength.RoundsFor(CurFirstTo);
+        if (lbl_oppName != null) lbl_oppName.text = CurOppName?.ToUpper() ?? Loc.T("OPPONENT");
     }
 
     void UpdateScoreDisplay(int myScore, int oppScore)
@@ -699,7 +700,7 @@ public class ArcadeGUIManager : MonoBehaviour
         if (lbl_resultTitle != null) lbl_resultTitle.text = iWon ? "YOU WIN!" : "YOU LOSE";
         if (lbl_resultScore != null) lbl_resultScore.text = CurMyScore + " - " + CurOppScore;
         if (lbl_resultDetail != null)
-            lbl_resultDetail.text = "VS " + (CurOppName?.ToUpper() ?? "OPPONENT");
+            lbl_resultDetail.text = Loc.T("VS") + " " + (CurOppName?.ToUpper() ?? Loc.T("OPPONENT"));
 
         // Reset the rematch controls for this result screen
         Show(btn_rematch, true);
@@ -746,7 +747,7 @@ public class ArcadeGUIManager : MonoBehaviour
     void OnOpponentDisconnected()
     {
         ShowMatchResult(true);
-        if (lbl_resultDetail != null) lbl_resultDetail.text = "OPPONENT DISCONNECTED";
+        if (lbl_resultDetail != null) lbl_resultDetail.text = Loc.T("OPPONENT DISCONNECTED");
 
         // There is nobody left to rematch with
         Show(btn_rematch, false);
@@ -769,7 +770,7 @@ public class ArcadeGUIManager : MonoBehaviour
             resultRecorded = false;
             HideAllArcadePanels();
             Show(pnl_arcadeWaiting, true);
-            if (lbl_waitingStatus != null) lbl_waitingStatus.text = "REMATCH...";
+            if (lbl_waitingStatus != null) lbl_waitingStatus.text = Loc.T("REMATCH...");
 
             pendingFee = 0;   // a match starts immediately; the fee is spent
             BotMatchManager.Instance?.Rematch();
@@ -785,7 +786,7 @@ public class ArcadeGUIManager : MonoBehaviour
 
         Show(btn_rematch, false);
         if (lbl_rematchStatus != null)
-            lbl_rematchStatus.text = "WAITING FOR OPPONENT...";
+            lbl_rematchStatus.text = Loc.T("WAITING FOR OPPONENT...");
 
         match.RequestRematch();
     }
@@ -793,19 +794,19 @@ public class ArcadeGUIManager : MonoBehaviour
     void OnOpponentWantsRematch()
     {
         if (lbl_rematchStatus != null)
-            lbl_rematchStatus.text = (CurOppName?.ToUpper() ?? "OPPONENT") + " WANTS A REMATCH!";
+            lbl_rematchStatus.text = (CurOppName?.ToUpper() ?? Loc.T("OPPONENT")) + "  ·  " + Loc.T("REMATCH");
     }
 
     void OnRematchDeclined()
     {
         Show(btn_rematch, false);
-        if (lbl_rematchStatus != null) lbl_rematchStatus.text = "OPPONENT LEFT";
+        if (lbl_rematchStatus != null) lbl_rematchStatus.text = Loc.T("OPPONENT LEFT");
     }
 
     void OnRematchTimedOut()
     {
         Show(btn_rematch, false);
-        if (lbl_rematchStatus != null) lbl_rematchStatus.text = "NO RESPONSE";
+        if (lbl_rematchStatus != null) lbl_rematchStatus.text = Loc.T("NO RESPONSE");
     }
 
     void OnRematchStarting()
@@ -814,7 +815,7 @@ public class ArcadeGUIManager : MonoBehaviour
 
         HideAllArcadePanels();
         Show(pnl_arcadeWaiting, true);
-        if (lbl_waitingStatus != null) lbl_waitingStatus.text = "REMATCH...";
+        if (lbl_waitingStatus != null) lbl_waitingStatus.text = Loc.T("REMATCH...");
     }
 
     // ═══════════════════════════════════════════════════════════════════

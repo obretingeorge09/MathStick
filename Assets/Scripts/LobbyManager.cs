@@ -52,8 +52,23 @@ public class LobbyManager : MonoBehaviour
     //  Online Users
     // ═══════════════════════════════════════════════════════════════════
 
+    /// <summary>
+    /// Whether the lobby offers a directory of everyone currently online.
+    ///
+    /// Off for launch: with nobody playing yet it is a heading over an empty
+    /// box reading 0 ONLINE, which makes the game look broken rather than new.
+    /// The friends list and RANDOM BATTLE still work — they are what actually
+    /// finds an opponent. Turn this on once there is a population to list.
+    /// </summary>
+    public const bool SHOW_ONLINE_PLAYERS = false;
+
     public void StartListeningOnlineUsers()
     {
+        // Also saves the presence subscription: a listener on the whole
+        // presence node is the most expensive read in the lobby, and nothing
+        // renders what it returns while the section is hidden.
+        if (!SHOW_ONLINE_PLAYERS) return;
+
         if (isListeningUsers) return;
         var db = FirebaseDBManager.Instance;
         if (db == null || !db.IsInitialized) return;

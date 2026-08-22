@@ -42,6 +42,9 @@ public enum Message
     // Segment or background colour changed in Settings. Anything that has to
     // stay readable against the board listens for this.
     OnThemeChanged,
+
+    // Display language changed. Every localized label re-renders.
+    OnLanguageChanged,
 }
 
 public enum ReceiveMessage

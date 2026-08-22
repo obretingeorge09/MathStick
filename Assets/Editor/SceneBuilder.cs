@@ -1067,13 +1067,30 @@ public static class SceneBuilder
         friendRowGO.SetActive(false); // template
 
         // ── Online Players section title (moved below friends) ───────
-        Img(lbt, "OnlineDivider", V2(.5f,1), V2(.5f,1), V2(0,-550), V2(800,2), Hex("#334155")).raycastTarget = false;
-        DigTxt(lbt, "lbl_online_title", "ONLINE PLAYERS", V2(0,1), V2(0,1), V2(250,-560), V2(400,30), 22, ACCENT,
-            TextAnchor.MiddleLeft).raycastTarget = false;
+        var onlineDivider = Img(lbt, "OnlineDivider", V2(.5f,1), V2(.5f,1), V2(0,-550), V2(800,2), Hex("#334155"));
+        onlineDivider.raycastTarget = false;
+        var lblOnlineTitle = DigTxt(lbt, "lbl_online_title", "ONLINE PLAYERS", V2(0,1), V2(0,1), V2(250,-560), V2(400,30), 22, ACCENT,
+            TextAnchor.MiddleLeft);
+        lblOnlineTitle.raycastTarget = false;
 
         // Move online player scroll to bottom half
         scrollRt.anchorMin = V2(0,0); scrollRt.anchorMax = V2(1,1);
         scrollRt.offsetMin = V2(40,100); scrollRt.offsetMax = V2(-40,-590);
+
+        // A directory of everyone online is a feature of a game that HAS
+        // people online. At launch it is a heading over an empty box that says
+        // 0 ONLINE, which reads as broken rather than new — so it is built but
+        // switched off, and the friends list takes the whole panel. Flip
+        // LobbyManager.ShowOnlinePlayers when there is a population to show.
+        if (!LobbyManager.SHOW_ONLINE_PLAYERS)
+        {
+            onlineDivider.gameObject.SetActive(false);
+            lblOnlineTitle.gameObject.SetActive(false);
+            lblLobbyStatus.gameObject.SetActive(false);
+            scrollGO.SetActive(false);
+
+            fScrollRt.offsetMin = V2(40, 100);   // friends fill the panel
+        }
 
         var lbBack = BackArrowButton(lbt, "btn_lobby_back", V2(0,1), V2(0,1), V2(70, -70), 80, arcDim);
 
@@ -1396,6 +1413,7 @@ public static class SceneBuilder
         RegisterPanel(ct, gui);
         ForgotPasswordPanel(ct, gui);
         SettingsPanel(ct, gui);
+        BuildLanguagePanel(ct, gui);
 
         // ── Progression screens: profile, leaderboard, daily ─────────────
         var prog = mgrs.AddComponent<ProgressionGUIManager>();
@@ -1562,6 +1580,10 @@ public static class SceneBuilder
         foreach (var kid in canvasKids)
             if (!fullBleed.Contains(kid.name))
                 kid.SetParent(safeGO.transform, false);
+
+        // Last, so it sees every label the build produced — including the
+        // ones inside panels that are switched off.
+        LocalizeAll(canvasGO);
 
         // Save
         if (!AssetDatabase.IsValidFolder("Assets/Scenes"))
@@ -2940,6 +2962,17 @@ public static class SceneBuilder
         AudioSliderRow(st, "row_music", "MUSIC", -950, AudioSliderBinder.Channel.Music);
         AudioSliderRow(st, "row_sfx",   "EFFECTS", -1040, AudioSliderBinder.Channel.SFX);
 
+        // ── LANGUAGE section ─────────────────────────────────────────
+        DigTxt(st, "lbl_language_title", "LANGUAGE", V2(.5f,1), V2(.5f,1), V2(0,-1140), V2(900,36), 24, TEXT_PRIMARY)
+            .raycastTarget = false;
+
+        var btnLang = SegButton(st, "btn_language", "English", V2(.5f,1), V2(.5f,1), V2(0,-1215),
+            V2(460, 78), 26, ACCENT);
+        btnLang.transform.Find("btn_face/lbl_btn").gameObject.AddComponent<LanguageLabel>();
+        UnityEventTools.AddPersistentListener(
+            btnLang.transform.Find("btn_face").GetComponent<Button>().onClick,
+            gui.OnLanguagePressed);
+
         // Back arrow
         var btnBack = BackArrowButton(st, "btn_settings_back", V2(0,1), V2(0,1), V2(70, -70), 80, ACCENT_DARK);
         UnityEventTools.AddPersistentListener(
@@ -2947,6 +2980,152 @@ public static class SceneBuilder
             gui.OnSettingsBackPressed);
 
         pnl.SetActive(false);
+    }
+
+    /// <summary>
+    /// The language list. Twenty rows do not belong under the audio sliders,
+    /// so this is its own screen — and every row names its language in that
+    /// language, because a list that reads "German" only once you are already
+    /// reading German cannot rescue someone who picked the wrong one.
+    /// </summary>
+    static void BuildLanguagePanel(Transform parent, GUIManager gui)
+    {
+        var pnl = Panel(parent, "pnl_language", V2(0,0), V2(1,1), V2(0,0), V2(0,0));
+        var lt = pnl.transform;
+        gui.pnl_language = pnl;
+
+        RoundImg(lt, "LangBG", V2(0,0), V2(1,1), V2(0,0), V2(0,0), Hex("#0A0E1AFA")).raycastTarget = false;
+
+        DigTxt(lt, "lbl_lang_title", "LANGUAGE", V2(.5f,1), V2(.5f,1), V2(0,-120), V2(900,57), 42, ACCENT).raycastTarget = false;
+        RoundImg(lt, "LangAccent", V2(.5f,1), V2(.5f,1), V2(0,-170), V2(120,3), ACCENT).raycastTarget = false;
+
+        var scrollGO = new GameObject("LangScrollView");
+        scrollGO.transform.SetParent(lt, false);
+        var scrollRt = scrollGO.AddComponent<RectTransform>();
+        scrollRt.anchorMin = V2(0,0); scrollRt.anchorMax = V2(1,1);
+        scrollRt.offsetMin = V2(60, 80); scrollRt.offsetMax = V2(-60, -220);
+        scrollGO.AddComponent<Image>().color = new Color(0,0,0,0.01f);
+
+        var scroll = scrollGO.AddComponent<ScrollRect>();
+        scroll.horizontal = false;
+        scrollGO.AddComponent<Mask>().showMaskGraphic = false;
+
+        var contentGO = new GameObject("Content");
+        contentGO.transform.SetParent(scrollGO.transform, false);
+        var contentRt = contentGO.AddComponent<RectTransform>();
+        contentRt.anchorMin = V2(0,1); contentRt.anchorMax = V2(1,1);
+        contentRt.pivot = V2(0.5f,1); contentRt.sizeDelta = V2(0,0);
+
+        var vlg = contentGO.AddComponent<VerticalLayoutGroup>();
+        vlg.spacing = 10;
+        vlg.childForceExpandWidth = true;
+        vlg.childForceExpandHeight = false;
+        vlg.childControlWidth = true;
+        vlg.childControlHeight = false;
+
+        var csf = contentGO.AddComponent<ContentSizeFitter>();
+        csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        scroll.content = contentRt;
+
+        for (int i = 0; i < Loc.Languages.Length; i++)
+        {
+            var row = SegButton(contentGO.transform, "row_lang_" + Loc.Languages[i].code,
+                Loc.Languages[i].nativeName, V2(0,1), V2(1,1), V2(0,0), V2(0, 82), 26, ACCENT);
+
+            // SegButton already anchored it across the row at a fixed height;
+            // the layout group drives the rest.
+            row.AddComponent<LayoutElement>().preferredHeight = 82;
+
+            var picker = row.AddComponent<LanguagePicker>();
+            picker.languageIndex = i;
+            picker.ring = SwatchRing(row.transform);
+        }
+
+        var back = BackArrowButton(lt, "btn_lang_back", V2(0,1), V2(0,1), V2(70, -70), 80, ACCENT_DARK);
+        UnityEventTools.AddPersistentListener(
+            back.transform.Find("btn_face").GetComponent<Button>().onClick,
+            gui.OnLanguageBackPressed);
+
+        pnl.SetActive(false);
+    }
+
+    /// <summary>
+    /// Attaches LocalizedText to everything the string table can translate.
+    ///
+    /// Done as one pass over the finished canvas rather than at each of the
+    /// hundred-odd call sites: a label added later is picked up automatically,
+    /// and there is no second list of strings to keep in step with the first.
+    /// </summary>
+    static void LocalizeAll(GameObject root)
+    {
+        var keys = LoadTableKeys();
+
+        // The title is the brand. Other studios leave theirs in Latin too, and
+        // it is the one place the segment lettering has to survive.
+        var brand = new System.Collections.Generic.HashSet<string> {
+            "lbl_title_glow", "lbl_title_main", "lbl_title2_glow", "lbl_title2_main",
+        };
+
+        int translated = 0, fontOnly = 0;
+
+        foreach (var t in root.GetComponentsInChildren<Text>(true))
+        {
+            if (brand.Contains(t.gameObject.name)) continue;
+            if (t.GetComponent<LocalizedText>() != null) continue;
+            if (t.GetComponent<LanguageLabel>() != null) continue;
+            // (true) — the language panel is switched off by the time this
+            // runs, and the no-arg overload does not look through inactive
+            // parents, so every row would have been localized after all.
+            if (t.GetComponentInParent<LanguagePicker>(true) != null) continue;
+
+            string text = t.text ?? "";
+
+            if (keys.Contains(text))
+            {
+                var lt = t.gameObject.AddComponent<LocalizedText>();
+                lt.key = text;
+                translated++;
+                continue;
+            }
+
+            // A score, a timer, an equals sign — no letters now and none later,
+            // so leave it in the segment font it was drawn for.
+            bool symbolic = true;
+            foreach (char c in text)
+                if (char.IsLetter(c)) { symbolic = false; break; }
+            if (symbolic) continue;
+
+            // Everything else carries text written at runtime — a name, a
+            // status line. It needs a font that can draw whatever arrives.
+            t.gameObject.AddComponent<LocalizedText>().fontOnly = true;
+            fontOnly++;
+        }
+
+        Debug.Log("SceneBuilder: localized " + translated + " labels, " +
+                  fontOnly + " font-only, from a table of " + keys.Count + " keys.");
+    }
+
+    static System.Collections.Generic.HashSet<string> LoadTableKeys()
+    {
+        var keys = new System.Collections.Generic.HashSet<string>();
+
+        var asset = Resources.Load<TextAsset>("i18n");
+        if (asset == null)
+        {
+            Debug.LogError("SceneBuilder: Assets/Resources/i18n.txt is missing — nothing will be localized.");
+            return keys;
+        }
+
+        var lines = asset.text.Split('\n');
+        for (int i = 1; i < lines.Length; i++)
+        {
+            var line = lines[i].TrimEnd('\r');
+            if (line.Length == 0 || line[0] == '#') continue;
+
+            int tab = line.IndexOf('\t');
+            if (tab > 0) keys.Add(line.Substring(0, tab).Replace("\\n", "\n"));
+        }
+        return keys;
     }
 
     /// <summary>One labelled volume slider bound to an AudioManager channel.</summary>
