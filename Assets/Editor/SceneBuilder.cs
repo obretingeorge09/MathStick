@@ -259,6 +259,13 @@ public static class SceneBuilder
             V2(440, 84), 26, TEXT_DIM);
 
         // ── Top strip: rank on the left, coins on the right ──────────
+        // Settings also lives at the bottom of the menu stack, but that is the
+        // sixth item down and dim — findable if you go looking, not if you are
+        // trying to turn the volume down or change the language on your way
+        // into a game. This mirrors the volume key on the opposite corner, so
+        // the two controls that are not about playing sit together.
+        var btnSettingsKey = GearButton(st, "btn_settings_key", V2(0,1), V2(0,1), V2(80, -135), 80, TEXT_DIM);
+
         var lblMenuRank = Txt(st, "lbl_menu_rank", "SILVER  1000",
             V2(0,1), V2(0,1), V2(230,-55), V2(400,40), 22, Hex("#C0C0C0"),
             TextAnchor.MiddleLeft, FontStyle.Bold);
@@ -1512,6 +1519,10 @@ public static class SceneBuilder
             pnlMode.transform.Find("btn_mode_back/btn_face").GetComponent<Button>().onClick,
             gui.OnModeBackPressed);
 
+        UnityEventTools.AddPersistentListener(
+            btnSettingsKey.transform.Find("btn_face").GetComponent<Button>().onClick,
+            gui.OnSettingsPressed);
+
         // ── Arcade button wiring ─────────────────────────────────────────
         // Mode select
         UnityEventTools.AddPersistentListener(
@@ -2164,8 +2175,24 @@ public static class SceneBuilder
     static Sprite s_backArrow;
     static Sprite BackArrowSprite => s_backArrow != null ? s_backArrow : (s_backArrow = MakeBackArrowSprite(128));
 
+    static Sprite s_gear;
+    static Sprite GearSprite => s_gear != null ? s_gear : (s_gear = MakeGearSprite(128));
+
     static GameObject BackArrowButton(Transform parent, string name,
         Vector2 aMin, Vector2 aMax, Vector2 pos, float size, Color color)
+    {
+        return RoundIconButton(parent, name, aMin, aMax, pos, size, color, BackArrowSprite);
+    }
+
+    static GameObject GearButton(Transform parent, string name,
+        Vector2 aMin, Vector2 aMax, Vector2 pos, float size, Color color)
+    {
+        return RoundIconButton(parent, name, aMin, aMax, pos, size, color, GearSprite);
+    }
+
+    /// <summary>A circular key with an icon on its face.</summary>
+    static GameObject RoundIconButton(Transform parent, string name,
+        Vector2 aMin, Vector2 aMax, Vector2 pos, float size, Color color, Sprite icon)
     {
         var go = Panel(parent, name, aMin, aMax, pos, V2(size, size));
         var ct = go.transform;
@@ -2188,7 +2215,7 @@ public static class SceneBuilder
         faceRt.anchorMin = V2(0,0); faceRt.anchorMax = V2(1,1);
         faceRt.offsetMin = V2(14,14); faceRt.offsetMax = V2(-14,-14);
         var faceImg = face.AddComponent<Image>();
-        faceImg.sprite = BackArrowSprite;
+        faceImg.sprite = icon;
         faceImg.color = color;
         faceImg.raycastTarget = true;
         var btn = face.AddComponent<Button>();
@@ -2200,6 +2227,53 @@ public static class SceneBuilder
         btn.colors = bc;
 
         return go;
+    }
+
+    /// <summary>
+    /// A gear: a hub, a body, and eight teeth. Drawn rather than shipped as a
+    /// PNG so it scales with the key and takes its colour from the palette
+    /// like every other surface here.
+    /// </summary>
+    static Sprite MakeGearSprite(int s)
+    {
+        var tex = new Texture2D(s, s, TextureFormat.RGBA32, false);
+        tex.filterMode = FilterMode.Bilinear;
+        tex.wrapMode = TextureWrapMode.Clamp;
+        var clear = new Color(0, 0, 0, 0);
+
+        const int TEETH = 8;
+        const float TOOTH_SHARE = 0.46f;   // of each tooth pitch that is tooth
+
+        float cx = s * 0.5f, cy = s * 0.5f;
+        float rHub  = s * 0.15f;   // the hole through the middle
+        float rBody = s * 0.32f;   // between the teeth
+        float rTip  = s * 0.46f;   // tooth tip
+
+        for (int y = 0; y < s; y++)
+        for (int x = 0; x < s; x++)
+        {
+            float dx = x - cx + 0.5f;
+            float dy = y - cy + 0.5f;
+            float dist = Mathf.Sqrt(dx * dx + dy * dy);
+
+            // Position within this tooth's pitch: 0 at a tooth centre, 1 at a gap
+            float turn = Mathf.Atan2(dy, dx) / (2f * Mathf.PI) + 0.5f;
+            float phase = turn * TEETH;
+            float frac = phase - Mathf.Floor(phase);
+            float away = Mathf.Abs(frac - 0.5f) * 2f;
+
+            // Softened across the flank so the teeth are not stair-stepped
+            float onTooth = Mathf.Clamp01(Mathf.InverseLerp(TOOTH_SHARE + 0.10f, TOOTH_SHARE - 0.10f, away));
+            float outer = Mathf.Lerp(rBody, rTip, onTooth);
+
+            float alpha = Mathf.Min(Mathf.Clamp01(outer - dist + 1f),
+                                    Mathf.Clamp01(dist - rHub + 1f));
+
+            tex.SetPixel(x, y, alpha > 0f ? new Color(1, 1, 1, alpha) : clear);
+        }
+
+        tex.Apply();
+        return Sprite.Create(tex, new Rect(0, 0, s, s), new Vector2(0.5f, 0.5f), 100f);
     }
 
     static Sprite MakeBackArrowSprite(int s)

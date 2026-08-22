@@ -204,6 +204,19 @@ public static class Loc
         }
     }
 
+    /// <summary>
+    /// Whether a first run should follow the device's language instead of
+    /// opening in English.
+    ///
+    /// Off. English is the default everywhere until someone picks otherwise,
+    /// so the game always starts as the screens were designed and reviewed —
+    /// in the segment lettering, with no translation between the build and
+    /// what is on screen. Turning this on is the one-line change that makes a
+    /// Spanish phone open in Spanish, which is what most stores' users expect;
+    /// it is a launch decision, not a code one.
+    /// </summary>
+    public static readonly bool FOLLOW_DEVICE_LANGUAGE = false;
+
     static int ResolveStartingLanguage()
     {
         string saved = PlayerPrefs.GetString(PREF_KEY, "");
@@ -211,13 +224,14 @@ public static class Loc
             for (int i = 0; i < Languages.Length; i++)
                 if (Languages[i].code == saved) return i;
 
-        // First run follows the device rather than making them go and find the
-        // setting. Some devices report Chinese without telling the two scripts
-        // apart, and Simplified is the larger market of the two.
+        if (!FOLLOW_DEVICE_LANGUAGE) return 0;
+
         var sys = Application.systemLanguage;
         for (int i = 0; i < Languages.Length; i++)
             if (Languages[i].system == sys) return i;
 
+        // Some devices report Chinese without telling the two scripts apart,
+        // and Simplified is the larger market of the two.
         if (sys == SystemLanguage.Chinese) return 1;
 
         return 0;

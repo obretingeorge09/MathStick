@@ -60,7 +60,7 @@ public class LobbyManager : MonoBehaviour
     /// The friends list and RANDOM BATTLE still work — they are what actually
     /// finds an opponent. Turn this on once there is a population to list.
     /// </summary>
-    public const bool SHOW_ONLINE_PLAYERS = false;
+    public static readonly bool SHOW_ONLINE_PLAYERS = false;
 
     public void StartListeningOnlineUsers()
     {
