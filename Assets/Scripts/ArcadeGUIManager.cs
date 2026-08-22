@@ -19,6 +19,9 @@ public class ArcadeGUIManager : MonoBehaviour
     public Text lbl_modeSelectTitle = null;
     public Text lbl_roundsRule = null;
 
+    /// <summary>Easy / Medium / Hard, in that order — the lines under each mode key.</summary>
+    public Text[] lbl_modeInfo = new Text[3];
+
     // Index 0..3 = Easy / Medium / Hard / Random, so the chosen one can be lit
     public SegButtonSelect[] sel_mode = new SegButtonSelect[4];
 
@@ -186,8 +189,28 @@ public class ArcadeGUIManager : MonoBehaviour
         UpdateModeSelectUI();
     }
 
+    /// <summary>
+    /// "2 DIGITS · WIN 20 XP · RANK x0.75" — words from the table, numbers
+    /// from MatchXp, so the screen can neither drift from the payout nor be
+    /// stuck in English.
+    /// </summary>
+    static string ModeInfoLine(GameMode mode, string digitsKey, string rankWeight) =>
+        Loc.T(digitsKey) + "  ·  " + Loc.T("WIN") + " " +
+        PlayerStatsManager.MatchXp(mode, true) + " XP  ·  " +
+        Loc.T("RANK") + " " + rankWeight;
+
     void UpdateModeSelectUI()
     {
+        if (lbl_modeInfo != null && lbl_modeInfo.Length >= 3)
+        {
+            if (lbl_modeInfo[0] != null)
+                lbl_modeInfo[0].text = ModeInfoLine(GameMode.Easy,   "2 DIGITS", "x0.75");
+            if (lbl_modeInfo[1] != null)
+                lbl_modeInfo[1].text = ModeInfoLine(GameMode.Medium, "3 DIGITS", "x1.0");
+            if (lbl_modeInfo[2] != null)
+                lbl_modeInfo[2].text = ModeInfoLine(GameMode.Hard,   "3 NUMBERS - 2 OPERATORS", "x1.25");
+        }
+
         if (lbl_modeSelectTitle != null)
             lbl_modeSelectTitle.text = Loc.T(selectedMode.ToString().ToUpper()) + "  ·  " +
                                        MatchLength.Label(selectedFirstTo);
@@ -442,7 +465,15 @@ public class ArcadeGUIManager : MonoBehaviour
         });
     }
 
-    /// <summary>Offered once per result, and only when a match actually paid XP.</summary>
+    /// <summary>
+    /// Offered once per result, and only when a match actually paid XP.
+    ///
+    /// Must run AFTER RecordMatchResult: it reads LastXpGain, so calling it as
+    /// the panel opened sized the offer by the PREVIOUS match — and hid it
+    /// entirely on the first match of a session, when LastXpGain is still 0.
+    /// It is also driven from OnStatsChanged, because a human match records
+    /// its result asynchronously and lands after the panel is already up.
+    /// </summary>
     void RefreshAdOffer()
     {
         var ads = AdManager.Instance;
@@ -626,7 +657,6 @@ public class ArcadeGUIManager : MonoBehaviour
     {
         HideAllArcadePanels();
         Show(pnl_arcadeResult, true);
-        RefreshAdOffer();
 
         // Hide main game panel
         var gui = FindObjectOfType<GUIManager>();
@@ -662,10 +692,12 @@ public class ArcadeGUIManager : MonoBehaviour
             string oppUid = inBotMatch ? null : ArcadeMatchManager.Instance?.OpponentUid;
             PlayerStatsManager.Instance?.RecordMatchResult(iWon, oppUid, inBotMatch, CurMode);
         }
-        else
-        {
-            RefreshResultElo();
-        }
+
+        // After the record, never before it — the offer is sized from
+        // LastXpGain. A human match records asynchronously, so OnStatsChanged
+        // drives this again when the real numbers land.
+        RefreshResultElo();
+        RefreshAdOffer();
     }
 
     /// <summary>Fills in the rating line once the async ELO update lands.</summary>
@@ -680,7 +712,10 @@ public class ArcadeGUIManager : MonoBehaviour
         int delta = stats.LastEloDelta;
         string sign = delta >= 0 ? "+" : "";
 
-        lbl_resultElo.text = sign + delta + "   ·   " + stats.Elo + " " + stats.RankName;
+        lbl_resultElo.text = sign + delta + "   ·   " + stats.Elo + " " + Loc.T(stats.RankName);
+
+        // The same signal carries the XP the ad offer is sized from
+        RefreshAdOffer();
         lbl_resultElo.color = delta >= 0
             ? new Color(0.46f, 1f, 0.01f)
             : new Color(1f, 0.09f, 0.27f);

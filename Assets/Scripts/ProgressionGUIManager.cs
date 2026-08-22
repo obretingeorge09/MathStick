@@ -341,8 +341,9 @@ public class ProgressionGUIManager : MonoBehaviour
         if (daily == null) return;
 
         if (lbl_daily_streak != null) lbl_daily_streak.text = daily.Streak.ToString();
-        if (lbl_daily_sub != null)
-            lbl_daily_sub.text = daily.Streak == 1 ? "DAY STREAK" : "DAY STREAK";
+        // Both branches used to be the same string, and a raw literal at that,
+        // which overwrote the label's translation on every refresh.
+        if (lbl_daily_sub != null) lbl_daily_sub.text = Loc.T("DAY STREAK");
         if (lbl_daily_best != null)
             lbl_daily_best.text = "BEST: " + daily.LongestStreak;
 

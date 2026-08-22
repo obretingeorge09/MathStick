@@ -571,7 +571,10 @@ public static class SceneBuilder
         };
 
         // ── 3-digit equation (Medium mode) ───────────────────────────────
+        // Same as the Easy card: a translucent dark panel over a white board
+        // is a grey slab, so on a light theme it flips to a soft white one.
         var eqBg3 = RoundImg(mt, "EqBG3", V2(.5f,.5f), V2(.5f,.5f), V2(0, -110), V2(880,960), Hex("#0F172A80"));
+        Adapt(eqBg3, Hex("#FFFFFF5C"));
         eqBg3.raycastTarget = false;
 
         var eqGO3 = Panel(mt, "Equation3D", V2(.5f,.5f), V2(.5f,.5f), V2(0,-110), V2(900,940));
@@ -625,6 +628,7 @@ public static class SceneBuilder
 
         // ── Hard mode equation (A ± B ± C = D, 2 digits each) ─────────
         var eqBgH = RoundImg(mt, "EqBGHard", V2(.5f,.5f), V2(.5f,.5f), V2(0, -110), V2(880,960), Hex("#0F172A80"));
+        Adapt(eqBgH, Hex("#FFFFFF5C"));
         eqBgH.raycastTarget = false;
 
         var eqGOH = Panel(mt, "EquationHard", V2(.5f,.5f), V2(.5f,.5f), V2(0, -110), V2(880,940));
@@ -882,18 +886,26 @@ public static class SceneBuilder
 
         var abEasy = SegButton(amt, "btn_arc_easy", "EASY", V2(.5f,1), V2(.5f,1), V2(0,-230),
             V2(380, 80), 28, mGreen2);
-        DigTxt(amt, "lbl_easy_info", "2 DIGITS  ·  PLAY 3  ·  WIN 10  ·  RANK x0.75",
-            V2(.5f,1), V2(.5f,1), V2(0,-292), V2(560,22), 14, TEXT_MUTED).raycastTarget = false;
+        // Written at RUNTIME by ArcadeGUIManager, not baked here: the line is
+        // half words and half numbers, so a baked string is neither a table
+        // key nor translatable. It used to read "PLAY 3 · WIN 10" — an entry
+        // fee that no longer exists and a payout in a currency that does not
+        // either.
+        var lblEasyInfo = DigTxt(amt, "lbl_easy_info", "2 DIGITS  ·  WIN 20 XP  ·  RANK x0.75",
+            V2(.5f,1), V2(.5f,1), V2(0,-292), V2(560,22), 14, TEXT_MUTED);
+        lblEasyInfo.raycastTarget = false;
 
         var abMed = SegButton(amt, "btn_arc_medium", "MEDIUM", V2(.5f,1), V2(.5f,1), V2(0,-370),
             V2(380, 80), 28, mYellow2);
-        DigTxt(amt, "lbl_med_info", "3 DIGITS  ·  PLAY 5  ·  WIN 18  ·  RANK x1.0",
-            V2(.5f,1), V2(.5f,1), V2(0,-432), V2(560,22), 14, TEXT_MUTED).raycastTarget = false;
+        var lblMedInfo = DigTxt(amt, "lbl_med_info", "3 DIGITS  ·  WIN 35 XP  ·  RANK x1.0",
+            V2(.5f,1), V2(.5f,1), V2(0,-432), V2(560,22), 14, TEXT_MUTED);
+        lblMedInfo.raycastTarget = false;
 
         var abHard = SegButton(amt, "btn_arc_hard", "HARD", V2(.5f,1), V2(.5f,1), V2(0,-510),
             V2(380, 80), 28, mRed2);
-        DigTxt(amt, "lbl_hard_info", "3 NUMBERS  ·  PLAY 9  ·  WIN 30  ·  RANK x1.25",
-            V2(.5f,1), V2(.5f,1), V2(0,-572), V2(560,22), 14, TEXT_MUTED).raycastTarget = false;
+        var lblHardInfo = DigTxt(amt, "lbl_hard_info", "3 NUMBERS  ·  WIN 55 XP  ·  RANK x1.25",
+            V2(.5f,1), V2(.5f,1), V2(0,-572), V2(560,22), 14, TEXT_MUTED);
+        lblHardInfo.raycastTarget = false;
 
         var abRand = SegButton(amt, "btn_arc_random", "RANDOM", V2(.5f,1), V2(.5f,1), V2(0,-650),
             V2(380, 80), 28, mCyan);
@@ -1210,16 +1222,26 @@ public static class SceneBuilder
             V2(.5f,.5f), V2(.5f,.5f), V2(0,-88), V2(500,40), 26, ACCENT,
             TextAnchor.MiddleCenter, FontStyle.Bold);
 
-        var arRematch = SegButton(art, "btn_rematch", "REMATCH", V2(.5f,.5f), V2(.5f,.5f), V2(0,-170),
+        // The rewarded ad. This is where it went when coins were removed, and
+        // for a while it went nowhere at all: the out-of-coins sheet that used
+        // to carry it was deleted and this was never built, so RefreshAdOffer
+        // was calling Show(null, true) and the offer never appeared.
+        //
+        // ArcadeGUIManager hides it whenever no ad is ready or the match paid
+        // no XP, so it is built visible and switched off at runtime.
+        var arWatchAd = SegButton(art, "btn_watch_ad", "WATCH AD  +20 XP", V2(.5f,.5f), V2(.5f,.5f), V2(0,-158),
+            V2(380, 78), 24, Hex("#4DD0E1"));
+
+        var arRematch = SegButton(art, "btn_rematch", "REMATCH", V2(.5f,.5f), V2(.5f,.5f), V2(0,-250),
             V2(380, 80), 28, arcCol);
 
         var lblRematchStatus = Txt(art, "lbl_rematch_status", "",
-            V2(.5f,.5f), V2(.5f,.5f), V2(0,-251), V2(500,30), 16, TEXT_MUTED,
+            V2(.5f,.5f), V2(.5f,.5f), V2(0,-330), V2(500,30), 16, TEXT_MUTED,
             TextAnchor.MiddleCenter, FontStyle.Normal);
 
-        var arLobby = SegButton(art, "btn_return_lobby", "RETURN TO LOBBY", V2(.5f,.5f), V2(.5f,.5f), V2(0,-321),
+        var arLobby = SegButton(art, "btn_return_lobby", "RETURN TO LOBBY", V2(.5f,.5f), V2(.5f,.5f), V2(0,-396),
             V2(380, 70), 22, arcDim);
-        var arMenu = SegButton(art, "btn_return_menu", "MAIN MENU", V2(.5f,.5f), V2(.5f,.5f), V2(0,-417),
+        var arMenu = SegButton(art, "btn_return_menu", "MAIN MENU", V2(.5f,.5f), V2(.5f,.5f), V2(0,-478),
             V2(380, 70), 22, arcDim);
 
         pnlArcResult.SetActive(false);
@@ -1328,6 +1350,9 @@ public static class SceneBuilder
         arcGui.pnl_invitePopup = pnlInvite;
         arcGui.lbl_modeSelectTitle = lblArcModeTitle;
         arcGui.lbl_roundsRule = lblRoundsRule;
+        arcGui.lbl_modeInfo = new[] { lblEasyInfo, lblMedInfo, lblHardInfo };
+        arcGui.btn_watchAd = arWatchAd;
+        arcGui.lbl_watchAd = arWatchAd.transform.Find("btn_face/lbl_btn").GetComponent<Text>();
         arcGui.sel_rounds = selRounds;
         arcGui.sel_mode = selModes;
         arcGui.inp_search = searchInp;
@@ -1534,6 +1559,9 @@ public static class SceneBuilder
         // Out of coins
 
         // Result
+        UnityEventTools.AddPersistentListener(
+            arWatchAd.transform.Find("btn_face").GetComponent<Button>().onClick,
+            arcGui.OnWatchAdPressed);
         UnityEventTools.AddPersistentListener(
             arRematch.transform.Find("btn_face").GetComponent<Button>().onClick,
             arcGui.OnRematchPressed);
@@ -1779,21 +1807,22 @@ public static class SceneBuilder
             rt.anchoredPosition = V2(startX + i * (size + GAP), y);
             rt.sizeDelta = V2(size, size);
 
+            // The ring first, then the edge, then the colour on TOP of both —
+            // and the colour has to be its own child rather than an Image on
+            // this GameObject, because a parent Graphic draws before every one
+            // of its children and no sibling ordering can get behind it.
             var ring = SwatchRing(swatch.transform);
 
-            var img = swatch.AddComponent<Image>();
-            img.sprite = RoundRect;
-            img.type = Image.Type.Sliced;
-            img.color = colors[i];
-
-            // Black on a near-black panel has no silhouette of its own, so the
-            // background swatches get a hairline to sit inside.
             if (showEdge)
             {
-                var edge = Shape(swatch.transform, "swatch_edge", RoundRect, Vector2.zero, V2(3,3), Hex("#FFFFFF33"));
+                // Pure black has no silhouette against a near-black panel, so
+                // the background swatches sit inside a hairline.
+                var edge = Shape(swatch.transform, "swatch_edge", RoundRect, Vector2.zero, V2(4,4), Hex("#FFFFFF44"));
                 edge.raycastTarget = false;
-                edge.transform.SetAsFirstSibling();
             }
+
+            var img = Shape(swatch.transform, "swatch_fill", RoundRect, Vector2.zero, Vector2.zero, colors[i]);
+            img.raycastTarget = true;    // the swatch is the button surface
 
             var btn = swatch.AddComponent<Button>();
             btn.targetGraphic = img;
@@ -1809,11 +1838,24 @@ public static class SceneBuilder
     }
 
     /// <summary>Frame behind a colour swatch, shown only while it is the chosen one.</summary>
+    /// <summary>
+    /// The selection frame. Two things about uGUI make the obvious version
+    /// wrong: a Graphic on a parent always draws BEFORE its children, and
+    /// SetAsFirstSibling only orders a node against its siblings, never
+    /// against the parent. So a filled rect added as a child of the thing it
+    /// highlights covers it completely — the chosen swatch turned solid lime.
+    ///
+    /// Hollow, so nothing it sits over is hidden even when it does draw last,
+    /// and first in the sibling order so it is behind the button faces it
+    /// frames on the language rows.
+    /// </summary>
     static Image SwatchRing(Transform swatch)
     {
-        var ring = Shape(swatch, "swatch_ring", RoundRect, Vector2.zero, V2(12, 12), ACCENT);
+        var ring = Shape(swatch, "swatch_ring", Ring, Vector2.zero, V2(14, 14), ACCENT);
+        ring.type = Image.Type.Simple;   // an annulus, not a 9-slice
         ring.raycastTarget = false;
-        ring.enabled = false;          // SettingsColorPicker turns it on
+        ring.enabled = false;            // SettingsColorPicker turns it on
+        ring.transform.SetAsFirstSibling();
         return ring;
     }
 
@@ -2658,7 +2700,12 @@ public static class SceneBuilder
         RoundImg(lt, "LoginBG", V2(0,0), V2(1,1), V2(0,0), V2(0,0), Hex("#0A0E1AFA")).raycastTarget = false;
 
         // Title
-        DigTxt(lt, "lbl_title", "MATHSTICK PUZZLE", V2(.5f,1), V2(.5f,1), V2(0,-300), V2(900,105), 70, ACCENT).raycastTarget = false;
+        // Named apart from the other lbl_title labels because LocalizeAll
+        // matches on GameObject name, and this one is the wordmark: it stays
+        // in the segment lettering and untranslated like the main menu's.
+        // Sixteen glyphs at 70px is close enough to the box that it gets the
+        // same best-fit treatment that put the K back on MATHSTICK.
+        Fit(DigTxt(lt, "lbl_login_brand", "MATHSTICK PUZZLE", V2(.5f,1), V2(.5f,1), V2(0,-300), V2(938,105), 70, ACCENT), 70, 34);
         RoundImg(lt, "LoginAccent", V2(.5f,1), V2(.5f,1), V2(0,-415), V2(120,3), ACCENT).raycastTarget = false;
 
         // Email input — big, centered
@@ -3124,6 +3171,8 @@ public static class SceneBuilder
         // it is the one place the segment lettering has to survive.
         var brand = new System.Collections.Generic.HashSet<string> {
             "lbl_title_glow", "lbl_title_main", "lbl_title2_glow", "lbl_title2_main",
+            // The login screen draws the wordmark too, under a different name
+            "lbl_login_brand",
         };
 
         int translated = 0, fontOnly = 0;
@@ -3563,9 +3612,6 @@ public static class SceneBuilder
         DigTxt(dt, "lbl_daily_title", "DAILY", V2(.5f,1), V2(.5f,1), V2(0,-70), V2(900,63), 42, Hex("#B388FF")).raycastTarget = false;
         RoundImg(dt, "DailyAccent", V2(.5f,1), V2(.5f,1), V2(0,-115), V2(120,3), Hex("#B388FF")).raycastTarget = false;
 
-        var coinDot = Img(dt, "img_daily_coin", V2(1,1), V2(1,1), V2(-215,-72), V2(22,22), Hex("#FFD600"));
-        coinDot.sprite = Circle;
-        coinDot.raycastTarget = false;
 
         var lblXpCell = Txt(dt, "lbl_daily_xp", "LV 1",
             V2(1,1), V2(1,1), V2(-110,-72), V2(180,40), 22, Hex("#FFD600"),

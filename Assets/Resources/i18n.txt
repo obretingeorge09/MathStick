@@ -8,7 +8,6 @@ DAILY	每日	每日	デイリー	일일	Diario	Diário	Ежедневно	Tägli
 SETTINGS	设置	設定	設定	설정	Ajustes	Definições	Настройки	Einstellungen	Réglages	Impostazioni	Ayarlar	Cài đặt	Pengaturan	Ustawienia	Instellingen	Налаштування	Nastavení	Inställningar	Setări
 HOW TO PLAY	玩法说明	玩法說明	遊び方	게임 방법	Cómo jugar	Como jogar	Как играть	Spielanleitung	Comment jouer	Come si gioca	Nasıl oynanır	Cách chơi	Cara bermain	Jak grać	Hoe te spelen	Як грати	Jak hrát	Så spelar du	Cum se joacă
 MAIN MENU	主菜单	主選單	メインメニュー	메인 메뉴	Menú principal	Menu principal	Главное меню	Hauptmenü	Menu principal	Menu principale	Ana menü	Menu chính	Menu utama	Menu główne	Hoofdmenu	Головне меню	Hlavní nabídka	Huvudmeny	Meniu principal
-BACK	返回	返回	戻る	뒤로	Atrás	Voltar	Назад	Zurück	Retour	Indietro	Geri	Quay lại	Kembali	Wstecz	Terug	Назад	Zpět	Tillbaka	Înapoi
 BACK TO MENU	返回菜单	返回選單	メニューへ戻る	메뉴로	Volver al menú	Voltar ao menu	В меню	Zum Menü	Retour au menu	Torna al menu	Menüye dön	Về menu	Ke menu	Do menu	Naar menu	До меню	Do nabídky	Till menyn	Înapoi la meniu
 CONTINUE	继续	繼續	つづける	계속	Continuar	Continuar	Продолжить	Weiter	Continuer	Continua	Devam	Tiếp tục	Lanjutkan	Kontynuuj	Doorgaan	Продовжити	Pokračovat	Fortsätt	Continuă
 DONE	完成	完成	完了	완료	Listo	Concluído	Готово	Fertig	Terminé	Fatto	Tamam	Xong	Selesai	Gotowe	Klaar	Готово	Hotovo	Klar	Gata
@@ -31,8 +30,6 @@ ROUND WON!	回合胜利！	回合勝利！	ラウンド勝利！	라운드 승�
 ROUND LOST	回合失利	回合失利	ラウンド敗北	라운드 패배	Ronda perdida	Ronda perdida	Раунд проигран	Runde verloren	Manche perdue	Round perso	Turu kaybettin	Thua vòng này	Ronde kalah	Runda przegrana	Ronde verloren	Раунд програно	Kolo prohráno	Omgången förlorad	Rundă pierdută
 SEGMENT COLOR	笔画颜色	筆畫顏色	セグメントの色	세그먼트 색상	Color del segmento	Cor do segmento	Цвет сегмента	Segmentfarbe	Couleur des segments	Colore dei segmenti	Segment rengi	Màu que	Warna segmen	Kolor segmentu	Segmentkleur	Колір сегмента	Barva segmentu	Segmentfärg	Culoarea segmentului
 BACKGROUND COLOR	背景颜色	背景顏色	背景色	배경 색상	Color de fondo	Cor de fundo	Цвет фона	Hintergrundfarbe	Couleur de fond	Colore di sfondo	Arka plan rengi	Màu nền	Warna latar	Kolor tła	Achtergrondkleur	Колір фону	Barva pozadí	Bakgrundsfärg	Culoarea fundalului
-DARK	深色	深色	ダーク	어두움	Oscuro	Escuro	Тёмные	Dunkel	Sombre	Scuro	Koyu	Tối	Gelap	Ciemne	Donker	Темні	Tmavé	Mörkt	Închise
-LIGHT	浅色	淺色	ライト	밝음	Claro	Claro	Светлые	Hell	Clair	Chiaro	Açık	Sáng	Terang	Jasne	Licht	Світлі	Světlé	Ljust	Deschise
 AUDIO	音频	音訊	サウンド	오디오	Audio	Áudio	Звук	Audio	Audio	Audio	Ses	Âm thanh	Audio	Dźwięk	Audio	Звук	Zvuk	Ljud	Audio
 MUSIC	音乐	音樂	音楽	음악	Música	Música	Музыка	Musik	Musique	Musica	Müzik	Nhạc	Musik	Muzyka	Muziek	Музика	Hudba	Musik	Muzică
 EFFECTS	音效	音效	効果音	효과음	Efectos	Efeitos	Эффекты	Effekte	Effets	Effetti	Efektler	Hiệu ứng	Efek	Efekty	Effecten	Ефекти	Efekty	Effekter	Efecte
@@ -55,7 +52,6 @@ RANDOM	随机	隨機	ランダム	랜덤	Aleatorio	Aleatório	Случайный
 MATCH LENGTH	比赛长度	比賽長度	試合の長さ	경기 길이	Duración	Duração	Длина матча	Spiellänge	Durée du match	Durata partita	Maç uzunluğu	Độ dài trận	Panjang laga	Długość meczu	Wedstrijdlengte	Тривалість матчу	Délka zápasu	Matchlängd	Lungimea meciului
 ROUNDS	回合	回合	ラウンド	라운드	Rondas	Rondas	Раунды	Runden	Manches	Round	Tur	Vòng	Ronde	Rundy	Rondes	Раунди	Kola	Omgångar	Runde
 SINGLE ROUND	单回合	單回合	1ラウンド	단판	Ronda única	Ronda única	Один раунд	Eine Runde	Manche unique	Round singolo	Tek tur	Một vòng	Satu ronde	Jedna runda	Eén ronde	Один раунд	Jedno kolo	En omgång	O singură rundă
-BEST OF	五局三胜制	五局三勝制	先取制	다전제	Al mejor de	À melhor de	До побед из	Best of	Au meilleur de	Al meglio di	En iyi	Thắng	Terbaik dari	Do	Best of	До перемог із	Na	Bäst av	Cel mai bun din
 WINS	胜	勝	勝	승	victorias	vitórias	побед	Siege	victoires	vittorie	galibiyet	thắng	menang	zwycięstw	overwinningen	перемог	výher	vinster	victorii
 ONE ROUND  ·  WINNER TAKES THE MATCH	单回合 · 胜者赢下比赛	單回合 · 勝者贏下比賽	1ラウンド · 勝者が試合を取る	단판 · 이긴 쪽이 경기 승리	Una ronda · quien gana, gana el partido	Uma ronda · quem vence, vence o jogo	Один раунд · победитель забирает матч	Eine Runde · der Sieger gewinnt das Spiel	Une manche · le gagnant remporte le match	Un round · chi vince prende la partita	Tek tur · kazanan maçı alır	Một vòng · ai thắng là thắng trận	Satu ronde · pemenang ambil laga	Jedna runda · zwycięzca bierze mecz	Eén ronde · de winnaar pakt de match	Один раунд · переможець забирає матч	Jedno kolo · vítěz bere zápas	En omgång · vinnaren tar matchen	O rundă · cine câștigă ia meciul
 2 DIGITS	两位数	兩位數	2けた	두 자리	2 cifras	2 algarismos	2 цифры	2 Ziffern	2 chiffres	2 cifre	2 basamak	2 chữ số	2 angka	2 cyfry	2 cijfers	2 цифри	2 číslice	2 siffror	2 cifre
@@ -144,3 +140,5 @@ Reset link sent! Check your email.	重置链接已发送，请查收邮件。	�
 No account found for this email.\nPlease create an account.	未找到使用该邮箱的账号。\n请先创建账号。	找不到使用該電子郵件的帳號。\n請先建立帳號。	このメールアドレスのアカウントが見つかりません。\nアカウントを作成してください。	이 이메일의 계정을 찾을 수 없습니다.\n계정을 만들어 주세요.	No hay ninguna cuenta con este correo.\nCrea una cuenta.	Não existe conta com este e-mail.\nCria uma conta.	Аккаунт с этой почтой не найден.\nСоздайте аккаунт.	Kein Konto mit dieser E-Mail gefunden.\nBitte erstelle ein Konto.	Aucun compte pour cet e-mail.\nCrée un compte.	Nessun account con questa e-mail.\nCrea un account.	Bu e-postayla hesap bulunamadı.\nLütfen hesap oluştur.	Không tìm thấy tài khoản với email này.\nHãy tạo tài khoản.	Akun dengan email ini tidak ditemukan.\nSilakan buat akun.	Nie znaleziono konta dla tego e-maila.\nZałóż konto.	Geen account met dit e-mailadres.\nMaak een account aan.	Акаунт із цією поштою не знайдено.\nСтворіть акаунт.	Účet s tímto e-mailem nenalezen.\nVytvořte si účet.	Inget konto med denna e-post.\nSkapa ett konto.	Nu există un cont cu acest e-mail.\nCreează un cont.
 LEVEL	等级	等級	レベル	레벨	Nivel	Nível	Уровень	Level	Niveau	Livello	Seviye	Cấp	Level	Poziom	Niveau	Рівень	Úroveň	Nivå	Nivel
 XP THIS LEVEL	本级经验	本級經驗	このレベルのXP	현재 레벨 XP	XP de este nivel	XP deste nível	Опыт на уровне	XP dieser Stufe	XP de ce niveau	XP di questo livello	Bu seviyedeki XP	XP cấp này	XP level ini	XP na tym poziomie	XP dit niveau	Досвід на рівні	XP této úrovně	XP på nivån	XP pe nivelul curent
+WIN	获得	獲得	獲得	획득	Gana	Ganha	Награда	Gewinn	Gain	Vinci	Kazan	Thắng	Menang	Zysk	Winst	Нагорода	Zisk	Vinst	Câștigi
+RANK	段位	段位	ランク	랭크	Rango	Ranque	Ранг	Rang	Rang	Rango	Rütbe	Hạng	Peringkat	Ranga	Rang	Ранг	Hodnost	Rank	Rang

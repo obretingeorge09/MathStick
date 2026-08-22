@@ -211,7 +211,10 @@ public class GUIManager : MonoBehaviour
 
         if (lbl_timeLabel != null)
         {
-            string caption = unlimited ? "TIME" : "TIME REMAINING";
+            // Through the table: this is written every frame, so a raw literal
+        // here overwrites the localized caption on the very next Update and
+        // the two table rows could never appear.
+        string caption = Loc.T(unlimited ? "TIME" : "TIME REMAINING");
             if (lbl_timeLabel.text != caption) lbl_timeLabel.text = caption;
         }
 
@@ -249,9 +252,13 @@ public class GUIManager : MonoBehaviour
 
             string best = lbl_highscore != null ? lbl_highscore.text : "0";
 
+            // Every label below is written AFTER pnl_continue.SetActive(true)
+            // for the same reason: activation fires LocalizedText.OnEnable,
+            // which restores each label's build-time text.
             if (id == "fadeToOpaqueAfterGameWon")
             {
-                if (lbl_inARow)    lbl_inARow.text    = streak + " IN A ROW!";
+                if (lbl_result)    lbl_result.text    = Loc.T("WELL DONE!");
+                if (lbl_inARow)    lbl_inARow.text    = streak + " " + Loc.T("IN A ROW!");
                 if (lbl_bestScore) lbl_bestScore.text  = "PERSONAL BEST: " + best;
                 if (lbl_correctAnswer) lbl_correctAnswer.gameObject.SetActive(false);
                 if (lbl_btnText)   lbl_btnText.text = Loc.T("CONTINUE");
@@ -261,6 +268,7 @@ public class GUIManager : MonoBehaviour
             }
             else
             {
+                if (lbl_result)    lbl_result.text = Loc.T("TIME'S UP!");
                 if (lbl_inARow)    lbl_inARow.text = Loc.T("STREAK LOST");
                 if (lbl_bestScore) lbl_bestScore.text  = "PERSONAL BEST: " + best;
                 if (lbl_correctAnswer)
@@ -308,6 +316,10 @@ public class GUIManager : MonoBehaviour
 
     void OnGameLost()
     {
+        // The panel is still inactive here, so the later SetActive(true) runs
+        // LocalizedText.OnEnable, which re-renders the label from its
+        // build-time key — "WELL DONE!" — over whatever was set now. The
+        // headline is written again below, once the panel is actually up.
         if (lbl_result != null) lbl_result.text = Loc.T("TIME'S UP!");
         Color c = Messenger.BroadcastReceiver<Color>(ReceiveMessage.ReceiveLoseGUIColor);
         pnl_continue.GetComponent<Image>().color = c;

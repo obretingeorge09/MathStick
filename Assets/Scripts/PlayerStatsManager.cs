@@ -280,7 +280,15 @@ public class PlayerStatsManager : MonoBehaviour
             ["updatedAt"]     = ServerValue.Timestamp
         };
 
-        db.GetRef("stats").Child(uid).UpdateChildrenAsync(data);
+        // The result was being discarded, so a rules rejection — the whole
+        // point of having rules — produced no sign anywhere that the write had
+        // not landed.
+        db.GetRef("stats").Child(uid).UpdateChildrenAsync(data).ContinueWith(t =>
+        {
+            if (t.IsFaulted || t.IsCanceled)
+                Debug.LogError("Stats save rejected: " +
+                               (t.Exception != null ? t.Exception.Message : "cancelled"));
+        });
 
         LeaderboardManager.Instance?.PublishMyEntry(name, Elo, Wins, Country);
     }
@@ -305,6 +313,23 @@ public class PlayerStatsManager : MonoBehaviour
     /// </summary>
     public void RecordMatchResult(bool won, string opponentUid, bool vsBot, GameMode mode)
     {
+        // A failed load leaves every counter at its constructor default, and
+        // Save() writes the whole record in one atomic UpdateChildrenAsync.
+        // Recording a match on top of that would send xp = 0 + one match,
+        // elo = 1000 and matches = 1 over the real values — and the rules
+        // reject the update as a whole (xp is monotonic, matches may not
+        // decrease), so the player would lose the match result AND everything
+        // else in the same write, silently.
+        //
+        // Load() already refuses to save on a failed read for exactly this
+        // reason; it just never stopped the NEXT save.
+        if (!IsLoaded)
+        {
+            Debug.LogWarning("Stats not loaded; not recording this match rather than " +
+                             "overwriting the server record with defaults.");
+            return;
+        }
+
         if (vsBot || string.IsNullOrEmpty(opponentUid))
         {
             ApplyResult(won, Elo, K_BOT, mode);
@@ -360,11 +385,12 @@ public class PlayerStatsManager : MonoBehaviour
 
         // XP is where difficulty actually pays: no ladder to distort, and the
         // player can see the number before choosing the mode.
+        //
+        // Routed through AddXp rather than added here, so a level crossed by
+        // winning a match raises OnLevelUp like every other way of earning.
+        // AddXp saves and fires OnStatsChanged itself.
         LastXpGain = MatchXp(mode, won);
-        Xp += LastXpGain;
-
-        Save();
-        OnStatsChanged?.Invoke();
+        AddXp(LastXpGain);
 
         DailyManager.Instance?.ReportMatchPlayed(won, mode);
     }
