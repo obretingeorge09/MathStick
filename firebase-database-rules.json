@@ -153,18 +153,25 @@
         ".write": "auth != null && auth.uid == $uid",
 
         // Creation is pinned to the game's actual starting state (elo 1000,
-        // coins 0 — START_COINS is paid on the first finished match, not on
-        // account creation). After that, per-write deltas bound the
-        // invisible cheat and absolute ceilings kill the visible one.
-        // Coin delta headroom: the biggest legitimate single write is the
-        // first finished match (+100 starter +30 Hard win = +130); the
-        // biggest daily grant is the capped streak bonus (+150). 300 covers
-        // both with room, and decreases (entry fees) are unrestricted.
+        // xp 0). After that, per-write deltas bound the invisible cheat and
+        // absolute ceilings kill the visible one.
         "elo": {
           ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 2500 && (data.exists() ? (newData.val() - data.val() <= 60 && data.val() - newData.val() <= 60) : newData.val() == 1000)"
         },
-        "coins": {
-          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000 && (data.exists() ? newData.val() - data.val() <= 300 : newData.val() == 0)"
+
+        // XP replaced coins and, unlike coins, only ever goes up — so this
+        // enforces monotonicity as well as a ceiling on the step. The largest
+        // legitimate single write is a Hard win (55) doubled by a rewarded ad
+        // (110); the largest daily grant is the capped streak bonus (150).
+        // 300 covers both with room.
+        //
+        // Accounts written before the change still carry a coins value the
+        // client reads once as its opening XP, so the first xp write on such
+        // an account is not zero. data.exists() is false there, which is why
+        // the creation branch allows any value inside the ceiling rather than
+        // pinning it to 0.
+        "xp": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000000 && (!data.exists() || (newData.val() >= data.val() && newData.val() - data.val() <= 300))"
         },
 
         // Career counters only ever go up, and they start at zero.

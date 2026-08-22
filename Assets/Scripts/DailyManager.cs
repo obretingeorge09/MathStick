@@ -338,7 +338,7 @@ public class DailyManager : MonoBehaviour
         int reward = StreakReward;
         streakClaimedDate = Today;
 
-        PlayerStatsManager.Instance?.AddCoins(reward);
+        PlayerStatsManager.Instance?.AddXp(reward);
 
         Save();
         OnDailyChanged?.Invoke();
@@ -353,14 +353,14 @@ public class DailyManager : MonoBehaviour
         if (!c.Completed || c.claimed) return false;
 
         c.claimed = true;
-        PlayerStatsManager.Instance?.AddCoins(c.reward);
+        PlayerStatsManager.Instance?.AddXp(c.reward);
 
         Save();
         OnDailyChanged?.Invoke();
         return true;
     }
 
-    /// <summary>Total coins sitting unclaimed right now — drives the menu badge.</summary>
+    /// <summary>Total XP sitting unclaimed right now — drives the menu badge.</summary>
     public int PendingRewards
     {
         get

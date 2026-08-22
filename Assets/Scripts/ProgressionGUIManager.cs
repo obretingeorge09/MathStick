@@ -30,7 +30,8 @@ public class ProgressionGUIManager : MonoBehaviour
     public Text  lbl_prof_streak  = null;
     public Text  lbl_prof_best    = null;
     public Text  lbl_prof_rounds  = null;
-    public Text  lbl_prof_coins   = null;
+    public Text  lbl_prof_xp     = null;
+    public Text  lbl_prof_level  = null;
 
     // ── Leaderboard ─────────────────────────────────────────────────────
     public Transform  lbContent    = null;
@@ -45,7 +46,7 @@ public class ProgressionGUIManager : MonoBehaviour
     public Text       lbl_daily_streak    = null;   // big number
     public Text       lbl_daily_sub       = null;   // "DAY STREAK"
     public Text       lbl_daily_best      = null;
-    public Text       lbl_daily_coins     = null;
+    public Text       lbl_daily_xp        = null;
     public GameObject btn_claim_streak    = null;
     public Text       lbl_claim_streak    = null;
     public Transform  challengeRow0       = null;
@@ -54,8 +55,8 @@ public class ProgressionGUIManager : MonoBehaviour
 
     // ── Start-screen badges ─────────────────────────────────────────────
     public Text       lbl_menu_rank  = null;
-    public Text       lbl_menu_coins = null;
-    public Text       lbl_arcade_coins = null;  // same balance, on the screen that charges
+    public Text       lbl_menu_xp = null;
+    public Text       lbl_arcade_xp = null;    // same total, on the arcade screen
     public GameObject badge_daily    = null;   // dot shown when rewards are waiting
 
     LeaderboardScope currentScope = LeaderboardScope.Global;
@@ -119,10 +120,11 @@ public class ProgressionGUIManager : MonoBehaviour
                 lbl_menu_rank.text = stats.RankName + "  " + stats.Elo;
                 lbl_menu_rank.color = stats.RankColor;
             }
-            if (lbl_menu_coins != null)
-                lbl_menu_coins.text = stats.Coins.ToString();
-            if (lbl_arcade_coins != null)
-                lbl_arcade_coins.text = stats.Coins.ToString();
+            // "LV 4" rather than a raw total: the number that means something
+            // at a glance is the level, and the XP behind it is on the profile.
+            string lv = "LV " + stats.Level;
+            if (lbl_menu_xp != null)   lbl_menu_xp.text = lv;
+            if (lbl_arcade_xp != null) lbl_arcade_xp.text = lv;
         }
 
         var daily = DailyManager.Instance;
@@ -181,7 +183,9 @@ public class ProgressionGUIManager : MonoBehaviour
         if (lbl_prof_streak != null)  lbl_prof_streak.text  = stats.CurrentStreak.ToString();
         if (lbl_prof_best != null)    lbl_prof_best.text    = stats.BestStreak.ToString();
         if (lbl_prof_rounds != null)  lbl_prof_rounds.text  = stats.RoundsWon + " / " + (stats.RoundsWon + stats.RoundsLost);
-        if (lbl_prof_coins != null)   lbl_prof_coins.text   = stats.Coins.ToString();
+        if (lbl_prof_level != null)   lbl_prof_level.text   = "LV " + stats.Level;
+        if (lbl_prof_xp != null)
+            lbl_prof_xp.text = stats.XpIntoLevel + " / " + stats.XpForThisLevel;
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -331,8 +335,8 @@ public class ProgressionGUIManager : MonoBehaviour
         var daily = DailyManager.Instance;
         var stats = PlayerStatsManager.Instance;
 
-        if (lbl_daily_coins != null && stats != null)
-            lbl_daily_coins.text = stats.Coins.ToString();
+        if (lbl_daily_xp != null && stats != null)
+            lbl_daily_xp.text = "LV " + stats.Level;
 
         if (daily == null) return;
 

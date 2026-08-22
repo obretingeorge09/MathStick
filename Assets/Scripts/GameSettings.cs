@@ -4,48 +4,39 @@ public class GameSettings : MonoBehaviour
 {
     public static GameSettings Instance { get; private set; }
 
-    // Segment color options
+    /// <summary>
+    /// Six segment colours, spread around the wheel so no two read as the same
+    /// choice at a glance. There were eight: pink sat next to red and violet
+    /// next to purple, which is two decisions the player does not get anything
+    /// for making.
+    /// </summary>
     public static readonly Color[] SegmentColors = {
         new Color(0.98f, 0.88f, 0.10f),  // 0 Yellow (default)
-        new Color(1.00f, 0.27f, 0.14f),  // 1 Red
-        new Color(0.26f, 0.52f, 0.96f),  // 2 Blue
+        new Color(1.00f, 0.60f, 0.00f),  // 1 Orange
+        new Color(1.00f, 0.27f, 0.14f),  // 2 Red
         new Color(0.30f, 0.87f, 0.37f),  // 3 Green
-        new Color(1.00f, 0.41f, 0.71f),  // 4 Pink
+        new Color(0.26f, 0.52f, 0.96f),  // 4 Blue
         new Color(0.73f, 0.33f, 0.83f),  // 5 Purple
-        new Color(0.55f, 0.36f, 0.96f),  // 6 Violet
-        new Color(1.00f, 0.60f, 0.00f),  // 7 Orange
     };
 
     public static readonly string[] SegmentColorNames = {
-        "YELLOW", "RED", "BLUE", "GREEN", "PINK", "PURPLE", "VIOLET", "ORANGE"
+        "YELLOW", "ORANGE", "RED", "GREEN", "BLUE", "PURPLE"
     };
 
     /// <summary>
-    /// Backgrounds, dark first then light. Every option used to be a near-black
-    /// from one palette, so the eight swatches were hard to tell apart and the
-    /// choice barely showed. The second row is deliberately from the other end:
-    /// a real display is as often dark digits on a pale panel as the reverse.
+    /// Black or white, and nothing in between.
     ///
-    /// The first four keep their old indices so a saved choice still resolves
-    /// to the colour it picked.
+    /// There were eight, six of them near-black and hard to tell apart in the
+    /// picker or on the board. A segment display is either lit glass or a
+    /// printed panel; the shades between were choices that changed nothing.
+    /// Everything drawn over the board follows this — see BackgroundIsLight.
     /// </summary>
     public static readonly Color[] BackgroundColors = {
-        new Color(0.03f, 0.05f, 0.10f),  // 0 Navy (default)
-        new Color(0.00f, 0.00f, 0.00f),  // 1 Black
-        new Color(0.10f, 0.05f, 0.05f),  // 2 Dark red
-        new Color(0.05f, 0.10f, 0.05f),  // 3 Dark green
-        new Color(0.94f, 0.92f, 0.87f),  // 4 Paper — warm off-white
-        new Color(0.78f, 0.83f, 0.75f),  // 5 Mint — the classic LCD panel
-        new Color(0.89f, 0.90f, 0.92f),  // 6 Silver — cool light grey
-        new Color(0.91f, 0.85f, 0.72f),  // 7 Sand — warm light
+        new Color(0.00f, 0.00f, 0.00f),  // 0 Black (default)
+        new Color(1.00f, 1.00f, 1.00f),  // 1 White
     };
 
-    public static readonly string[] BackgroundColorNames = {
-        "NAVY", "BLACK", "DARK RED", "DARK GREEN", "PAPER", "MINT", "SILVER", "SAND"
-    };
-
-    /// <summary>Index of the first light background — where the second row starts.</summary>
-    public const int FIRST_LIGHT_BG = 4;
+    public static readonly string[] BackgroundColorNames = { "BLACK", "WHITE" };
 
     int segColorIndex;
     int bgColorIndex;
@@ -61,8 +52,8 @@ public class GameSettings : MonoBehaviour
 
     /// <summary>
     /// Whether the board is pale enough that an emissive palette would vanish
-    /// on it. Measured rather than compared against FIRST_LIGHT_BG, so adding a
-    /// colour to the table cannot get this wrong.
+    /// on it. Measured from the colour rather than matched against an index,
+    /// so adding a shade to the table cannot get this wrong.
     /// </summary>
     public bool BackgroundIsLight => Luminance(SelectedBgColor) > 0.45f;
 

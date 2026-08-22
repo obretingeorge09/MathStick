@@ -258,25 +258,25 @@ public static class SceneBuilder
         SegButton(st, "btn_settings", "SETTINGS", V2(.5f,1), V2(.5f,1), V2(0, -1464),
             V2(440, 84), 26, TEXT_DIM);
 
-        // ── Top strip: rank on the left, coins on the right ──────────
+        // ── Top strip: rank on the left, level on the right ──────────
         // Settings also lives at the bottom of the menu stack, but that is the
         // sixth item down and dim — findable if you go looking, not if you are
         // trying to turn the volume down or change the language on your way
         // into a game. This mirrors the volume key on the opposite corner, so
         // the two controls that are not about playing sit together.
-        var btnSettingsKey = GearButton(st, "btn_settings_key", V2(0,1), V2(0,1), V2(80, -135), 80, TEXT_DIM);
+        // The volume key is a 120px box pivoted at its top-right corner, hung
+        // at (-8,-135) — so its 76px visual centres at y -195, not -135. Match
+        // that centre and that size, mirrored, or the two keys sit a clear
+        // 60px apart and read as unrelated controls.
+        var btnSettingsKey = GearButton(st, "btn_settings_key", V2(0,1), V2(0,1), V2(68, -195), 76, ACCENT_DARK);
 
         var lblMenuRank = Txt(st, "lbl_menu_rank", "SILVER  1000",
             V2(0,1), V2(0,1), V2(230,-55), V2(400,40), 22, Hex("#C0C0C0"),
             TextAnchor.MiddleLeft, FontStyle.Bold);
 
-        var coinDot = Img(st, "img_coin", V2(1,1), V2(1,1), V2(-215,-55), V2(22,22), Hex("#FFD600"));
-        coinDot.sprite = Circle;
-        coinDot.raycastTarget = false;
-
-        var lblMenuCoins = Txt(st, "lbl_menu_coins", "0",
-            V2(1,1), V2(1,1), V2(-110,-55), V2(180,40), 22, Hex("#FFD600"),
-            TextAnchor.MiddleLeft, FontStyle.Bold);
+        var lblMenuLevel = Txt(st, "lbl_menu_xp", "LV 1",
+            V2(1,1), V2(1,1), V2(-120,-55), V2(200,40), 22, Hex("#4DD0E1"),
+            TextAnchor.MiddleRight, FontStyle.Bold);
 
         // ── Best score — BOTTOM of screen, big ──────────────────────
         var bestGO = Panel(st, "BestFrame", V2(.5f,0), V2(.5f,0), V2(0, 180), V2(400, 140));
@@ -937,15 +937,10 @@ public static class SceneBuilder
             V2(420, 80), 26, arcDim);
 
         // Back
-        // Same coin readout as the DAILY panel, so the fee is never a surprise
-        var arcCoinDot = Img(amt, "img_arc_coin", V2(1,1), V2(1,1), V2(-215,-72), V2(22,22), Hex("#FFD600"));
-        arcCoinDot.sprite = Circle;
-        arcCoinDot.raycastTarget = false;
-
-        var lblArcCoins = Txt(amt, "lbl_arc_coins", "0",
-            V2(1,1), V2(1,1), V2(-110,-72), V2(180,40), 22, Hex("#FFD600"),
-            TextAnchor.MiddleLeft, FontStyle.Bold);
-        lblArcCoins.raycastTarget = false;
+        var lblArcLevel = Txt(amt, "lbl_arcade_xp", "LV 1",
+            V2(1,1), V2(1,1), V2(-120,-72), V2(200,40), 22, Hex("#4DD0E1"),
+            TextAnchor.MiddleRight, FontStyle.Bold);
+        lblArcLevel.raycastTarget = false;
 
         var abBack = BackArrowButton(amt, "btn_arc_back", V2(0,1), V2(0,1), V2(70, -70), 80, arcDim);
 
@@ -1256,50 +1251,11 @@ public static class SceneBuilder
 
         pnlInvite.SetActive(false);
 
-        // ── pnl_noCoins ──────────────────────────────────────────────────
-        // The out-of-coins sheet. TRAINING is listed as a first-class exit, not
-        // a consolation: an ad must never be the only way back into the game,
-        // and there are stretches where no ad can be served at all.
-        var pnlNoCoins = Panel(ct, "pnl_noCoins", V2(0,0), V2(1,1), V2(0,0), V2(0,0));
-        var nct = pnlNoCoins.transform;
-        Img(nct, "NoCoinsOverlay", V2(0,0), V2(1,1), V2(0,0), V2(0,0), new Color(0,0,0,0.78f)).raycastTarget = true;
-
-        var ncCard = Panel(nct, "NoCoinsCard", V2(.5f,.5f), V2(.5f,.5f), V2(0,0), V2(700, 620));
-        var ncc = ncCard.transform;
-        var ncShadow = Img(ncc, "CardShadow", V2(0,0), V2(1,1), V2(0,-8), V2(0,0), Hex("#030703CC"));
-        ncShadow.sprite = RoundRect; ncShadow.type = Image.Type.Sliced;
-        ncShadow.pixelsPerUnitMultiplier = 1f; ncShadow.raycastTarget = false;
-
-        var ncRim = Img(ncc, "CardRim", V2(0,0), V2(1,1), V2(0,0), V2(0,0), Hex("#FFD600"));
-        ncRim.sprite = RoundRect; ncRim.type = Image.Type.Sliced;
-        ncRim.pixelsPerUnitMultiplier = 1f; ncRim.raycastTarget = false;
-
-        var ncFace = Img(ncc, "CardFace", V2(0,0), V2(1,1), V2(0,0), V2(-6,-6), Hex("#0E140EFA"));
-        ncFace.sprite = RoundRect; ncFace.type = Image.Type.Sliced;
-        ncFace.pixelsPerUnitMultiplier = 1f; ncFace.raycastTarget = false;
-
-        var ncCoin = Img(ncc, "img_nc_coin", V2(.5f,1), V2(.5f,1), V2(0,-58), V2(46,46), Hex("#FFD600"));
-        ncCoin.sprite = Circle; ncCoin.raycastTarget = false;
-
-        DigTxt(ncc, "lbl_nc_title", "NOT ENOUGH COINS", V2(.5f,1), V2(.5f,1), V2(0,-118), V2(620,40), 26, Hex("#FFD600"))
-            .raycastTarget = false;
-
-        var lblNcDetail = Txt(ncc, "lbl_nc_detail", "NEED 8  ·  YOU HAVE 0",
-            V2(.5f,1), V2(.5f,1), V2(0,-162), V2(620,30), 18, TEXT_MUTED,
-            TextAnchor.MiddleCenter, FontStyle.Normal);
-        lblNcDetail.raycastTarget = false;
-
-        var ncAd = SegButton(ncc, "btn_watch_ad", "WATCH AD  +30", V2(.5f,1), V2(.5f,1), V2(0,-250),
-            V2(580, 110), 28, Hex("#FFD600"));
-        var ncTrain = SegButton(ncc, "btn_play_training", "PLAY TRAINING  ·  FREE", V2(.5f,1), V2(.5f,1), V2(0,-380),
-            V2(580, 96), 24, ACCENT);
-        var ncBack = SegButton(ncc, "btn_nocoins_back", "BACK", V2(.5f,1), V2(.5f,1), V2(0,-490),
-            V2(580, 80), 22, ACCENT_DARK);
-
-        DigTxt(ncc, "lbl_nc_note", "DAILY BONUS ARRIVES TOMORROW", V2(.5f,1), V2(.5f,1), V2(0,-560), V2(620,22), 14, TEXT_MUTED)
-            .raycastTarget = false;
-
-        pnlNoCoins.SetActive(false);
+        // The out-of-coins sheet used to live here. It existed because a coin
+        // balance could hit zero, and XP cannot — so the sheet, the ad button
+        // on it, the free-entry counter and the new-player shield all went
+        // with it. The rewarded ad now sits on the result screen instead,
+        // where it reaches everyone rather than only a player who has run out.
 
         // ── Simulated-ad placeholder, used until a real SDK is installed ──
         var pnlAdStub = Panel(ct, "pnl_ad_stub", V2(0,0), V2(1,1), V2(0,0), V2(0,0));
@@ -1396,10 +1352,6 @@ public static class SceneBuilder
         arcGui.lbl_inviteMode = lblInvMode;
         arcGui.pnl_roundOverlay = pnlRoundOvr;
         arcGui.lbl_roundResult = lblRoundRes;
-        arcGui.pnl_noCoins = pnlNoCoins;
-        arcGui.lbl_noCoins_detail = lblNcDetail;
-        arcGui.btn_watchAd = ncAd;
-        arcGui.lbl_watchAd = ncAd.transform.Find("btn_face/lbl_btn").GetComponent<Text>();
         arcGui.lbl_roundAnswer = lblRoundAns;
         arcGui.lbl_resultAnswer = lblResAns;
 
@@ -1467,8 +1419,8 @@ public static class SceneBuilder
         DailyPanel(ct, prog);
 
         prog.lbl_menu_rank  = lblMenuRank;
-        prog.lbl_menu_coins = lblMenuCoins;
-        prog.lbl_arcade_coins = lblArcCoins;
+        prog.lbl_menu_xp = lblMenuLevel;
+        prog.lbl_arcade_xp = lblArcLevel;
         prog.badge_daily    = dailyBadge.gameObject;
 
         var card = pnlCont.transform.Find("Card");
@@ -1580,15 +1532,6 @@ public static class SceneBuilder
             arcGui.OnDeclineInvitePressed);
 
         // Out of coins
-        UnityEventTools.AddPersistentListener(
-            ncAd.transform.Find("btn_face").GetComponent<Button>().onClick,
-            arcGui.OnWatchAdPressed);
-        UnityEventTools.AddPersistentListener(
-            ncTrain.transform.Find("btn_face").GetComponent<Button>().onClick,
-            arcGui.OnPlayTrainingPressed);
-        UnityEventTools.AddPersistentListener(
-            ncBack.transform.Find("btn_face").GetComponent<Button>().onClick,
-            arcGui.OnNoCoinsBackPressed);
 
         // Result
         UnityEventTools.AddPersistentListener(
@@ -1812,6 +1755,57 @@ public static class SceneBuilder
         sr.decelerationRate = 0.135f;
 
         return sr;
+    }
+
+    /// <summary>
+    /// One centred row of colour swatches. colorType is 0 for segments, 1 for
+    /// the background — the same code SettingsColorPicker reads back.
+    /// </summary>
+    static void SwatchRow(Transform parent, string namePrefix, int colorType,
+                          Color[] colors, string[] names, float y, float size, bool showEdge)
+    {
+        const float GAP = 16f;
+
+        float totalW = colors.Length * size + (colors.Length - 1) * GAP;
+        float startX = -totalW * 0.5f + size * 0.5f;
+
+        for (int i = 0; i < colors.Length; i++)
+        {
+            var swatch = new GameObject(namePrefix + "_" + i);
+            swatch.transform.SetParent(parent, false);
+
+            var rt = swatch.AddComponent<RectTransform>();
+            rt.anchorMin = V2(.5f,1); rt.anchorMax = V2(.5f,1);
+            rt.anchoredPosition = V2(startX + i * (size + GAP), y);
+            rt.sizeDelta = V2(size, size);
+
+            var ring = SwatchRing(swatch.transform);
+
+            var img = swatch.AddComponent<Image>();
+            img.sprite = RoundRect;
+            img.type = Image.Type.Sliced;
+            img.color = colors[i];
+
+            // Black on a near-black panel has no silhouette of its own, so the
+            // background swatches get a hairline to sit inside.
+            if (showEdge)
+            {
+                var edge = Shape(swatch.transform, "swatch_edge", RoundRect, Vector2.zero, V2(3,3), Hex("#FFFFFF33"));
+                edge.raycastTarget = false;
+                edge.transform.SetAsFirstSibling();
+            }
+
+            var btn = swatch.AddComponent<Button>();
+            btn.targetGraphic = img;
+
+            DigTxt(swatch.transform, "lbl", names[i],
+                V2(0,0), V2(1,0), V2(0,-8), V2(0,20), 11, Color.white).raycastTarget = false;
+
+            var picker = swatch.AddComponent<SettingsColorPicker>();
+            picker.colorType = colorType;
+            picker.colorIndex = i;
+            picker.ring = ring;
+        }
     }
 
     /// <summary>Frame behind a colour swatch, shown only while it is the chosen one.</summary>
@@ -2990,100 +2984,19 @@ public static class SceneBuilder
         RoundImg(st, "SettingsAccent", V2(.5f,1), V2(.5f,1), V2(0,-170), V2(120,3), ACCENT).raycastTarget = false;
 
         // ── SEGMENT COLOR section ────────────────────────────────────
+        // Both palettes are one row now, sized from the array rather than a
+        // hardcoded 8, so changing the palette cannot leave a gap or an
+        // IndexOutOfRange behind.
         DigTxt(st, "lbl_seg_title", "SEGMENT COLOR", V2(.5f,1), V2(.5f,1), V2(0,-230), V2(900,36), 24, TEXT_PRIMARY).raycastTarget = false;
 
-        float swatchSize = 80f;
-        float gap = 14f;
-        float totalW = 4 * swatchSize + 3 * gap;
-        float startX = -totalW / 2f + swatchSize / 2f;
-
-        for (int i = 0; i < 8; i++)
-        {
-            int row = i / 4;
-            int col = i % 4;
-            float x = startX + col * (swatchSize + gap);
-            float y = -300f - row * (swatchSize + gap + 10);
-
-            var swatch = new GameObject("swatch_seg_" + i);
-            swatch.transform.SetParent(st, false);
-            var srt = swatch.AddComponent<RectTransform>();
-            srt.anchorMin = V2(.5f,1); srt.anchorMax = V2(.5f,1);
-            srt.anchoredPosition = V2(x, y);
-            srt.sizeDelta = V2(swatchSize, swatchSize);
-
-            var ring = SwatchRing(swatch.transform);
-
-            var sImg = swatch.AddComponent<Image>();
-            sImg.sprite = RoundRect;
-            sImg.type = Image.Type.Sliced;
-            sImg.color = GameSettings.SegmentColors[i];
-
-            var sBtn = swatch.AddComponent<Button>();
-            sBtn.targetGraphic = sImg;
-
-            // Label under swatch
-            DigTxt(swatch.transform, "lbl", GameSettings.SegmentColorNames[i],
-                V2(0,0), V2(1,0), V2(0,-8), V2(0,20), 11, Color.white).raycastTarget = false;
-
-            // Wire via SettingsColorPicker component
-            var picker = swatch.AddComponent<SettingsColorPicker>();
-            picker.colorType = 0; // segment
-            picker.colorIndex = i;
-            picker.ring = ring;
-        }
+        SwatchRow(st, "swatch_seg", 0, GameSettings.SegmentColors,
+                  GameSettings.SegmentColorNames, -310f, 80f, false);
 
         // ── BACKGROUND COLOR section ─────────────────────────────────
-        DigTxt(st, "lbl_bg_title", "BACKGROUND COLOR", V2(.5f,1), V2(.5f,1), V2(0,-530), V2(900,36), 24, TEXT_PRIMARY).raycastTarget = false;
+        DigTxt(st, "lbl_bg_title", "BACKGROUND COLOR", V2(.5f,1), V2(.5f,1), V2(0,-430), V2(900,36), 24, TEXT_PRIMARY).raycastTarget = false;
 
-        // The two rows are two different kinds of board, not eight variations
-        // of one, so each says which it is.
-        DigTxt(st, "lbl_bg_dark",  "DARK",  V2(.5f,1), V2(.5f,1), V2(0,-566), V2(900,20), 13, TEXT_MUTED).raycastTarget = false;
-        DigTxt(st, "lbl_bg_light", "LIGHT", V2(.5f,1), V2(.5f,1), V2(0,-700), V2(900,20), 13, TEXT_MUTED).raycastTarget = false;
-
-        for (int i = 0; i < 8; i++)
-        {
-            int row = i / 4;
-            int col = i % 4;
-            float x = startX + col * (swatchSize + gap);
-            float y = -624f - row * 134f;
-
-            var swatch = new GameObject("swatch_bg_" + i);
-            swatch.transform.SetParent(st, false);
-            var srt = swatch.AddComponent<RectTransform>();
-            srt.anchorMin = V2(.5f,1); srt.anchorMax = V2(.5f,1);
-            srt.anchoredPosition = V2(x, y);
-            srt.sizeDelta = V2(swatchSize, swatchSize);
-
-            // Selection frame, drawn behind and slightly proud of the swatch.
-            // Toggled by SettingsColorPicker.
-            var ring = SwatchRing(swatch.transform);
-
-            var sImg = swatch.AddComponent<Image>();
-            sImg.sprite = RoundRect;
-            sImg.type = Image.Type.Sliced;
-
-            // The real colour. These used to be drawn three times brighter "for
-            // visibility", which meant the swatch never showed the board you
-            // were choosing — and with light options in the table it would just
-            // clip them all to white. A hairline keeps the dark ones findable
-            // against the panel instead.
-            sImg.color = GameSettings.BackgroundColors[i];
-
-            var edge = Shape(swatch.transform, "swatch_edge", RoundRect, Vector2.zero, V2(2,2), Hex("#FFFFFF22"));
-            edge.raycastTarget = false;
-            edge.transform.SetAsFirstSibling();
-
-            var sBtn = swatch.AddComponent<Button>();
-            sBtn.targetGraphic = sImg;
-
-            DigTxt(swatch.transform, "lbl", GameSettings.BackgroundColorNames[i],
-                V2(0,0), V2(1,0), V2(0,-8), V2(0,20), 10, Color.white).raycastTarget = false;
-
-            var picker = swatch.AddComponent<SettingsColorPicker>();
-            picker.colorType = 1; // background
-            picker.colorIndex = i;
-            picker.ring = ring;
-        }
+        SwatchRow(st, "swatch_bg", 1, GameSettings.BackgroundColors,
+                  GameSettings.BackgroundColorNames, -510f, 96f, true);
 
         // ── AUDIO section ────────────────────────────────────────────
         // The corner key rides the master level, which is the situational
@@ -3094,17 +3007,17 @@ public static class SceneBuilder
         // pnl_settings carries ScrollablePanel, so every child must be TOP
         // anchored; anything centred would resolve against the fixed 1920
         // content box instead of the screen.
-        DigTxt(st, "lbl_audio_title", "AUDIO", V2(.5f,1), V2(.5f,1), V2(0,-880), V2(900,36), 24, TEXT_PRIMARY)
+        DigTxt(st, "lbl_audio_title", "AUDIO", V2(.5f,1), V2(.5f,1), V2(0,-640), V2(900,36), 24, TEXT_PRIMARY)
             .raycastTarget = false;
 
-        AudioSliderRow(st, "row_music", "MUSIC", -950, AudioSliderBinder.Channel.Music);
-        AudioSliderRow(st, "row_sfx",   "EFFECTS", -1040, AudioSliderBinder.Channel.SFX);
+        AudioSliderRow(st, "row_music", "MUSIC", -710, AudioSliderBinder.Channel.Music);
+        AudioSliderRow(st, "row_sfx",   "EFFECTS", -800, AudioSliderBinder.Channel.SFX);
 
         // ── LANGUAGE section ─────────────────────────────────────────
-        DigTxt(st, "lbl_language_title", "LANGUAGE", V2(.5f,1), V2(.5f,1), V2(0,-1140), V2(900,36), 24, TEXT_PRIMARY)
+        DigTxt(st, "lbl_language_title", "LANGUAGE", V2(.5f,1), V2(.5f,1), V2(0,-900), V2(900,36), 24, TEXT_PRIMARY)
             .raycastTarget = false;
 
-        var btnLang = SegButton(st, "btn_language", "English", V2(.5f,1), V2(.5f,1), V2(0,-1215),
+        var btnLang = SegButton(st, "btn_language", "English", V2(.5f,1), V2(.5f,1), V2(0,-975),
             V2(460, 78), 26, ACCENT);
         btnLang.transform.Find("btn_face/lbl_btn").gameObject.AddComponent<LanguageLabel>();
         UnityEventTools.AddPersistentListener(
@@ -3508,7 +3421,8 @@ public static class SceneBuilder
         var lblStreak  = StatCell("lbl_prof_streak",  "WIN STREAK",   -230, -715, ACCENT);
         var lblBest    = StatCell("lbl_prof_best",    "BEST STREAK",   230, -715, ACCENT);
         var lblRounds  = StatCell("lbl_prof_rounds",  "ROUNDS WON",   -230, -830, TEXT_PRIMARY);
-        var lblCoins   = StatCell("lbl_prof_coins",   "COINS",         230, -830, Hex("#FFD600"));
+        var lblXpCell   = StatCell("lbl_prof_xp",      "XP THIS LEVEL", 230, -830, Hex("#4DD0E1"));
+        var lblLevel   = StatCell("lbl_prof_level",   "LEVEL",         230, -930, Hex("#4DD0E1"));
 
         var back = BackArrowButton(pt, "btn_prof_back", V2(0,1), V2(0,1), V2(70, -70), 80, ACCENT_DARK);
         UnityEventTools.AddPersistentListener(
@@ -3525,7 +3439,8 @@ public static class SceneBuilder
         prog.lbl_prof_streak  = lblStreak;
         prog.lbl_prof_best    = lblBest;
         prog.lbl_prof_rounds  = lblRounds;
-        prog.lbl_prof_coins   = lblCoins;
+        prog.lbl_prof_xp      = lblXpCell;
+        prog.lbl_prof_level   = lblLevel;
 
         pnl.SetActive(false);
     }
@@ -3652,7 +3567,7 @@ public static class SceneBuilder
         coinDot.sprite = Circle;
         coinDot.raycastTarget = false;
 
-        var lblCoins = Txt(dt, "lbl_daily_coins", "0",
+        var lblXpCell = Txt(dt, "lbl_daily_xp", "LV 1",
             V2(1,1), V2(1,1), V2(-110,-72), V2(180,40), 22, Hex("#FFD600"),
             TextAnchor.MiddleLeft, FontStyle.Bold);
 
@@ -3700,7 +3615,7 @@ public static class SceneBuilder
         prog.lbl_daily_streak = lblStreak;
         prog.lbl_daily_sub    = lblSub;
         prog.lbl_daily_best   = lblBest;
-        prog.lbl_daily_coins  = lblCoins;
+        prog.lbl_daily_xp     = lblXpCell;
         prog.btn_claim_streak = btnClaim;
         prog.lbl_claim_streak = btnClaim.transform.Find("btn_face/lbl_btn").GetComponent<Text>();
         prog.challengeRow0    = row0;

@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 
 /// <summary>
-/// Owns the player's competitive record: rating, win/loss, streaks and coins.
+/// Owns the player's record: rating, win/loss, streaks and experience.
 ///
 /// Stored at stats/{uid} in Realtime Database and mirrored into the
 /// leaderboards whenever it changes. Loaded once after login and kept in
@@ -15,18 +15,6 @@ public class PlayerStatsManager : MonoBehaviour
     public static PlayerStatsManager Instance { get; private set; }
 
     public const int START_ELO = 1000;
-
-    /// <summary>
-    /// Opening balance, paid when the player FINISHES their first match rather
-    /// than when the account appears.
-    ///
-    /// Granting it on creation made a throwaway anonymous account worth 100
-    /// coins on sight — more than a rewarded ad pays — so reinstalling beat
-    /// watching an ad. Nobody is stranded meanwhile: the new-player shield
-    /// makes the first 25 ranked matches free, and the day-one login bonus
-    /// lands regardless.
-    /// </summary>
-    public const int START_COINS = 100;
 
     // K-factor: how much a single match can move the rating.
     // Bot matches move it half as far so the ladder stays meaningful.
@@ -43,8 +31,8 @@ public class PlayerStatsManager : MonoBehaviour
     /// swing keeps the rating honest (it still measures who beats whom) and
     /// makes difficulty a real bet rather than free points.
     ///
-    /// The actual reward for difficulty is paid in coins, below, where
-    /// inflation does not corrupt anything.
+    /// The visible reward for difficulty is paid in XP, below, where inflation
+    /// does not corrupt anything.
     /// </summary>
     static float RankWeight(GameMode mode)
     {
@@ -56,114 +44,66 @@ public class PlayerStatsManager : MonoBehaviour
         }
     }
 
-    /// <summary>Coins paid for winning a match, by difficulty.</summary>
-    public static int WinCoins(GameMode mode)
+    // ═══════════════════════════════════════════════════════════════════
+    //  Experience
+    // ═══════════════════════════════════════════════════════════════════
+    //
+    // This replaced a coin balance, and the important part is not the rename.
+    //
+    // Coins were spent to enter a ranked match, which meant the balance could
+    // fall. The break-even win rate of a fee/payout economy is exactly
+    // fee/payout, and ELO matchmaking drives every player toward 50% — so the
+    // balance was a near-zero-drift random walk against an absorbing barrier
+    // at zero. Such a walk reaches zero with probability 1. It needed a
+    // new-player shield, daily free entries, and an out-of-coins sheet with a
+    // rewarded ad, and all three existed to hold back a floor the design had
+    // built in on purpose.
+    //
+    // XP only goes up. There is no floor to defend, so all of that machinery
+    // is gone, and every match is free.
+
+    /// <summary>XP for finishing a match. Losing still pays — see above.</summary>
+    public static int MatchXp(GameMode mode, bool won)
     {
         switch (mode)
         {
-            case GameMode.Easy:   return 10;
-            case GameMode.Hard:   return 30;
-            default:              return 18;
+            case GameMode.Easy:   return won ? 20 : 6;
+            case GameMode.Hard:   return won ? 55 : 16;
+            default:              return won ? 35 : 10;
         }
     }
 
     /// <summary>
-    /// Coins taken to enter a ranked match.
+    /// Total XP needed to REACH this level: 50·(n−1)·n.
     ///
-    /// The break-even win rate is exactly fee/payout. The first version used
-    /// 5/8/12 against payouts of 10/18/30, which put Easy's break-even at
-    /// 5/10 = 50% — precisely the win rate that ELO matchmaking and the
-    /// rating-tracking bot drive every player toward. Expected drift there is
-    /// exactly zero, and a zero-drift random walk against an absorbing barrier
-    /// at zero reaches zero with probability 1. Over 100 Easy matches, 46% of
-    /// players ended below where they started. Easy is also where weaker
-    /// players live, so the old ladder punished exactly the people who most
-    /// needed to keep playing.
-    ///
-    /// 3/5/9 puts every mode near a 30% break-even, so an even win rate drifts
-    /// upward everywhere and dropping to Easy after a slump is a real recovery.
-    ///
-    /// TRAINING never charges. That is the guarantee that nobody can be locked
-    /// out of the game itself, only out of ranked 1v1.
+    /// The gap between levels grows by a flat 100 each time — 100, 200, 300 —
+    /// so early levels arrive quickly enough to explain what the bar is for,
+    /// and later ones stay worth reaching without the curve running away.
     /// </summary>
-    public static int EntryFee(GameMode mode)
+    public static int XpForLevel(int level) => 50 * (level - 1) * Mathf.Max(level, 0);
+
+    /// <summary>Level from total XP — the inverse of XpForLevel.</summary>
+    public static int LevelForXp(int xp)
     {
-        switch (mode)
-        {
-            case GameMode.Easy:   return 3;
-            case GameMode.Hard:   return 9;
-            default:              return 5;
-        }
+        if (xp <= 0) return 1;
+
+        // 50n² − 50n − xp ≤ 0  ⇒  n ≤ (50 + √(2500 + 200·xp)) / 100
+        return Mathf.Max(1, Mathf.FloorToInt((50f + Mathf.Sqrt(2500f + 200f * xp)) / 100f));
     }
 
-    /// <summary>Ranked entry is free until the player has this many matches.</summary>
-    public const int SHIELD_MATCHES = 25;
+    public int Level => LevelForXp(Xp);
 
-    /// <summary>Free ranked entries granted per day once the player is broke.</summary>
-    public const int FREE_ENTRIES_PER_DAY = 3;
+    /// <summary>XP earned since this level began.</summary>
+    public int XpIntoLevel => Xp - XpForLevel(Level);
 
-    int    freeEntriesUsed;
-    string freeEntriesDate = "";
+    /// <summary>XP this level costs in total — the denominator of the bar.</summary>
+    public int XpForThisLevel => XpForLevel(Level + 1) - XpForLevel(Level);
 
-    /// <summary>A newcomer cannot be priced out before they know the game.</summary>
-    public bool HasNewPlayerShield => Matches < SHIELD_MATCHES;
+    /// <summary>0..1 through the current level.</summary>
+    public float LevelProgress =>
+        XpForThisLevel > 0 ? Mathf.Clamp01((float)XpIntoLevel / XpForThisLevel) : 0f;
 
-    public int FreeEntriesRemaining
-    {
-        get { SyncFreeEntryDay(); return Mathf.Max(0, FREE_ENTRIES_PER_DAY - freeEntriesUsed); }
-    }
-
-    static string TodayKey => FirebaseDBManager.Instance != null
-        ? FirebaseDBManager.Instance.ServerDateKey
-        : DateTime.UtcNow.ToString("yyyy-MM-dd");
-
-    void SyncFreeEntryDay()
-    {
-        string today = TodayKey;
-        if (freeEntriesDate == today) return;
-
-        freeEntriesDate = today;
-        freeEntriesUsed = 0;
-        PlayerPrefs.SetString("FreeEntryDate", freeEntriesDate);
-        PlayerPrefs.SetInt("FreeEntryUsed", 0);
-        PlayerPrefs.Save();
-    }
-
-    /// <summary>
-    /// Spends one of the day's free entries. This is the floor that makes the
-    /// anti-lockout guarantee true for ranked play too, not just for training.
-    /// </summary>
-    public bool TryUseFreeEntry()
-    {
-        if (FreeEntriesRemaining <= 0) return false;
-
-        freeEntriesUsed++;
-        PlayerPrefs.SetInt("FreeEntryUsed", freeEntriesUsed);
-        PlayerPrefs.SetString("FreeEntryDate", freeEntriesDate);
-        PlayerPrefs.Save();
-
-        OnStatsChanged?.Invoke();
-        return true;
-    }
-
-    public bool CanAfford(GameMode mode) => Coins >= EntryFee(mode);
-
-    /// <summary>
-    /// Deducts the entry fee. Returns false and changes nothing when the player
-    /// cannot pay, so the caller can offer the top-up flow instead.
-    /// </summary>
-    public bool TrySpendCoins(int amount)
-    {
-        if (amount <= 0) return true;
-        if (Coins < amount) return false;
-
-        Coins -= amount;
-        Save();
-        OnStatsChanged?.Invoke();
-        return true;
-    }
-
-    public event Action OnStatsChanged;
+    public event Action OnStatsChanged;    public event Action OnStatsChanged;
 
     // ── Live values ─────────────────────────────────────────────────────
     public int    Elo           { get; private set; } = START_ELO;
@@ -174,7 +114,7 @@ public class PlayerStatsManager : MonoBehaviour
     public int    BestStreak    { get; private set; }
     public int    RoundsWon     { get; private set; }
     public int    RoundsLost    { get; private set; }
-    public int    Coins         { get; private set; }
+    public int    Xp            { get; private set; }
     public string Country       { get; private set; } = "XX";
 
     public bool IsLoaded { get; private set; }
@@ -190,9 +130,6 @@ public class PlayerStatsManager : MonoBehaviour
         else { Destroy(this); return; }
 
         Country = DetectCountry();
-
-        freeEntriesUsed = PlayerPrefs.GetInt("FreeEntryUsed", 0);
-        freeEntriesDate = PlayerPrefs.GetString("FreeEntryDate", "");
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -282,8 +219,7 @@ public class PlayerStatsManager : MonoBehaviour
                     return;
                 }
 
-                // A new account starts empty; START_COINS is paid on the first
-                // finished match instead (see ApplyResult).
+                // A new account starts empty and earns from the first match on
                 if (t.Result != null && t.Result.Exists) ReadFrom(t.Result);
 
                 IsLoaded = true;
@@ -305,7 +241,10 @@ public class PlayerStatsManager : MonoBehaviour
         BestStreak    = ReadInt(snap, "bestStreak", 0);
         RoundsWon     = ReadInt(snap, "roundsWon", 0);
         RoundsLost    = ReadInt(snap, "roundsLost", 0);
-        Coins         = ReadInt(snap, "coins", 0);
+        // Accounts written before XP still carry a coin balance. Reading it
+        // once as the opening XP means a tester keeps their number instead of
+        // being reset to zero by a rename.
+        Xp            = ReadInt(snap, "xp", ReadInt(snap, "coins", 0));
     }
 
     static int ReadInt(DataSnapshot snap, string key, int fallback)
@@ -337,7 +276,7 @@ public class PlayerStatsManager : MonoBehaviour
             ["bestStreak"]    = BestStreak,
             ["roundsWon"]     = RoundsWon,
             ["roundsLost"]    = RoundsLost,
-            ["coins"]         = Coins,
+            ["xp"]            = Xp,
             ["updatedAt"]     = ServerValue.Timestamp
         };
 
@@ -419,13 +358,10 @@ public class PlayerStatsManager : MonoBehaviour
             CurrentStreak = 0;
         }
 
-        // Coins are where difficulty actually pays: no ladder to distort, and
-        // the player can see the number before choosing the mode.
-        if (won) Coins += WinCoins(mode);
-
-        // Matches is monotonic and server-validated, so this fires exactly once
-        // in the lifetime of an account.
-        if (Matches == 1) Coins += START_COINS;
+        // XP is where difficulty actually pays: no ladder to distort, and the
+        // player can see the number before choosing the mode.
+        LastXpGain = MatchXp(mode, won);
+        Xp += LastXpGain;
 
         Save();
         OnStatsChanged?.Invoke();
@@ -433,12 +369,22 @@ public class PlayerStatsManager : MonoBehaviour
         DailyManager.Instance?.ReportMatchPlayed(won, mode);
     }
 
-    public void AddCoins(int amount)
-    {
-        if (amount == 0) return;
+    /// <summary>XP from the most recent match, for the result screen.</summary>
+    public int LastXpGain { get; private set; }
 
-        Coins = Mathf.Max(0, Coins + amount);
+    public void AddXp(int amount)
+    {
+        if (amount <= 0) return;
+
+        int before = Level;
+
+        Xp += amount;
         Save();
         OnStatsChanged?.Invoke();
+
+        if (Level > before) OnLevelUp?.Invoke(Level);
     }
+
+    /// <summary>Raised after AddXp crosses a threshold. Carries the new level.</summary>
+    public event Action<int> OnLevelUp;
 }

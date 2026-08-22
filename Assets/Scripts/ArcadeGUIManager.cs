@@ -61,9 +61,6 @@ public class ArcadeGUIManager : MonoBehaviour
     public Text lbl_inviteFrom = null;
     public Text lbl_inviteMode = null;
 
-    // ── Out of coins ────────────────────────────────────────────────────
-    public GameObject pnl_noCoins = null;
-    public Text lbl_noCoins_detail = null;
     public GameObject btn_watchAd = null;
     public Text lbl_watchAd = null;
 
@@ -83,7 +80,6 @@ public class ArcadeGUIManager : MonoBehaviour
 
     // Charged when the search starts, refunded if the player backs out before
     // a match is ever made. Nobody pays for a queue they left.
-    int pendingFee = 0;
 
     int      CurMyScore  => inBotMatch ? (BotMatchManager.Instance?.MyScore ?? 0)
                                        : (ArcadeMatchManager.Instance?.MyScore ?? 0);
@@ -219,7 +215,6 @@ public class ArcadeGUIManager : MonoBehaviour
 
     public void OnRandomBattlePressed()
     {
-        if (!TryPayEntry()) return;
 
         HideAllArcadePanels();
         Show(pnl_arcadeWaiting, true);
@@ -230,7 +225,6 @@ public class ArcadeGUIManager : MonoBehaviour
 
     public void OnCancelSearchPressed()
     {
-        RefundEntry();
         LobbyManager.Instance?.LeaveRandomQueue();
 
         // The bot fallback may already have kicked in while this panel was up
@@ -406,7 +400,6 @@ public class ArcadeGUIManager : MonoBehaviour
 
     void SendInviteToUser(string uid)
     {
-        if (!TryPayEntry()) return;
 
         LobbyManager.Instance?.SendInvite(uid, selectedMode, selectedFirstTo);
 
@@ -420,106 +413,57 @@ public class ArcadeGUIManager : MonoBehaviour
     // ═══════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Takes the entry fee, or opens the top-up sheet and refuses. Random is
-    /// charged at the Medium rate because the real difficulty is not decided
-    /// until the match starts.
+    /// XP added on top of a finished match for watching an ad — the same
+    /// amount again, so the offer is worth reading but never worth more than
+    /// playing another match.
+    ///
+    /// This is where the rewarded placement went when coins were removed. It
+    /// used to sit on an out-of-coins sheet, which only appeared to a player
+    /// who had run out and was already having a bad time; on the result screen
+    /// it reaches everyone, at the moment they are pleased with themselves.
     /// </summary>
-    bool TryPayEntry()
-    {
-        var stats = PlayerStatsManager.Instance;
-        if (stats == null) return true;   // no economy loaded yet — never block
-
-        GameMode feeMode = selectedMode == GameMode.Random ? GameMode.Medium : selectedMode;
-        int fee = PlayerStatsManager.EntryFee(feeMode);
-
-        // A newcomer must never be priced out before they know the game
-        if (stats.HasNewPlayerShield) { pendingFee = 0; return true; }
-
-        if (stats.TrySpendCoins(fee)) { pendingFee = fee; return true; }
-
-        // Broke: the day's free entries are what make "you can always play"
-        // true for ranked as well, not only for training
-        if (stats.TryUseFreeEntry()) { pendingFee = 0; return true; }
-
-        ShowNoCoins(fee, stats.Coins);
-        return false;
-    }
-
-    /// <summary>Give the fee back — the player never reached a match.</summary>
-    void RefundEntry()
-    {
-        if (pendingFee <= 0) return;
-
-        PlayerStatsManager.Instance?.AddCoins(pendingFee);
-        pendingFee = 0;
-    }
-
-    void ShowNoCoins(int needed, int have)
-    {
-        HideAllArcadePanels();
-        Show(pnl_noCoins, true);
-
-        if (lbl_noCoins_detail != null)
-        {
-            int free = PlayerStatsManager.Instance != null
-                ? PlayerStatsManager.Instance.FreeEntriesRemaining : 0;
-
-            lbl_noCoins_detail.text = free > 0
-                ? "NEED " + needed + "  ·  YOU HAVE " + have + "  ·  " + free + " FREE LEFT"
-                : "NEED " + needed + "  ·  YOU HAVE " + have;
-        }
-
-        // The ad is an accelerator, never the only door. TRAINING is free and
-        // the daily bonus lands tomorrow regardless, so this sheet always has
-        // a way out even when no ad can be served.
-        bool adReady = AdManager.Instance != null && AdManager.Instance.IsRewardedReady;
-        Show(btn_watchAd, adReady);
-
-        if (lbl_watchAd != null && adReady)
-            lbl_watchAd.text = "WATCH AD  +" + AD_REWARD;
-    }
-
-    /// <summary>
-    /// Deliberately below the 50-coin day-1 login bonus. An ad that pays more
-    /// than showing up teaches the player to skip the daily hook.
-    /// </summary>
-    public const int AD_REWARD = 30;
-
     public void OnWatchAdPressed()
     {
         var ads = AdManager.Instance;
-        if (ads == null || !ads.IsRewardedReady) return;
+        var stats = PlayerStatsManager.Instance;
+        if (ads == null || stats == null || !ads.IsRewardedReady) return;
+
+        int bonus = stats.LastXpGain;
+        if (bonus <= 0) return;
 
         if (lbl_watchAd != null) lbl_watchAd.text = Loc.T("LOADING...");
+        Show(btn_watchAd, false);
 
         ads.ShowRewarded(watched =>
         {
-            // Only a completed view pays. Rewarding a dismissal is against every
-            // ad network's policy and is how accounts get suspended.
-            if (watched) PlayerStatsManager.Instance?.AddCoins(AD_REWARD);
-
-            var stats = PlayerStatsManager.Instance;
-            if (stats == null) return;
-
-            GameMode feeMode = selectedMode == GameMode.Random ? GameMode.Medium : selectedMode;
-            ShowNoCoins(PlayerStatsManager.EntryFee(feeMode), stats.Coins);
+            // Only a completed view pays. Rewarding a dismissal is against
+            // every ad network's policy and is how accounts get suspended.
+            if (watched) stats.AddXp(bonus);
         });
     }
 
-    /// <summary>Free mode — the guaranteed exit from the out-of-coins sheet.</summary>
+    /// <summary>Offered once per result, and only when a match actually paid XP.</summary>
+    void RefreshAdOffer()
+    {
+        var ads = AdManager.Instance;
+        var stats = PlayerStatsManager.Instance;
+
+        bool offer = ads != null && ads.IsRewardedReady
+                  && stats != null && stats.LastXpGain > 0;
+
+        Show(btn_watchAd, offer);
+
+        if (offer && lbl_watchAd != null)
+            lbl_watchAd.text = Loc.T("WATCH AD") + "  +" + stats.LastXpGain + " XP";
+    }
+
+    /// <summary>Training is free and always was. Kept as an exit from the result screen.</summary>
     public void OnPlayTrainingPressed()
     {
-        Show(pnl_noCoins, false);
         HideAllArcadePanels();
 
         var gui = FindObjectOfType<GUIManager>();
         if (gui != null) gui.OnPlayPressed();
-    }
-
-    public void OnNoCoinsBackPressed()
-    {
-        Show(pnl_noCoins, false);
-        ShowModeSelect();
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -556,7 +500,6 @@ public class ArcadeGUIManager : MonoBehaviour
 
     void OnInviteDeclined()
     {
-        RefundEntry();
         if (lbl_waitingStatus != null) lbl_waitingStatus.text = Loc.T("INVITE DECLINED");
         StartCoroutine(ReturnToModeSelectAfterDelay(2f));
     }
@@ -569,7 +512,6 @@ public class ArcadeGUIManager : MonoBehaviour
     {
         inBotMatch = false;
         resultRecorded = false;
-        pendingFee = 0;   // the match exists; the fee is now genuinely spent
 
         HideAllArcadePanels();
         Show(pnl_arcadeWaiting, true);
@@ -597,7 +539,6 @@ public class ArcadeGUIManager : MonoBehaviour
 
         inBotMatch = true;
         resultRecorded = false;
-        pendingFee = 0;
 
         HideAllArcadePanels();
         Show(pnl_arcadeWaiting, true);
@@ -685,6 +626,7 @@ public class ArcadeGUIManager : MonoBehaviour
     {
         HideAllArcadePanels();
         Show(pnl_arcadeResult, true);
+        RefreshAdOffer();
 
         // Hide main game panel
         var gui = FindObjectOfType<GUIManager>();
@@ -762,7 +704,6 @@ public class ArcadeGUIManager : MonoBehaviour
         // A rematch is a new match and costs the same as any other. Without
         // this the fee was a one-off: bots always accept, so a single payment
         // bought an unlimited session.
-        if (!TryPayEntry()) return;
 
         // Bots never decline, so a rematch starts straight away
         if (inBotMatch)
@@ -772,7 +713,6 @@ public class ArcadeGUIManager : MonoBehaviour
             Show(pnl_arcadeWaiting, true);
             if (lbl_waitingStatus != null) lbl_waitingStatus.text = Loc.T("REMATCH...");
 
-            pendingFee = 0;   // a match starts immediately; the fee is spent
             BotMatchManager.Instance?.Rematch();
             return;
         }
@@ -869,7 +809,6 @@ public class ArcadeGUIManager : MonoBehaviour
         Show(pnl_arcadeResult, false);
         Show(pnl_invitePopup, false);
         Show(pnl_roundOverlay, false);
-        Show(pnl_noCoins, false);
     }
 
     public void HideAllPanels()
@@ -880,7 +819,6 @@ public class ArcadeGUIManager : MonoBehaviour
     void ShowError(string msg)
     {
         // Whatever went wrong, the player never reached a match — give it back
-        RefundEntry();
 
         Debug.LogError("Arcade: " + msg);
         if (lbl_waitingStatus != null && pnl_arcadeWaiting.activeSelf)
