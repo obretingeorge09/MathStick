@@ -103,7 +103,7 @@ public class ArcadeMatchManager : MonoBehaviour
                 // Parse settings
                 string modeStr = snap.Child("settings/mode").Value?.ToString() ?? "Easy";
                 Enum.TryParse(modeStr, out matchMode);
-                firstTo = 3;
+                firstTo = MatchLength.DefaultFirstTo;
                 if (snap.Child("settings/firstTo").Value != null)
                     int.TryParse(snap.Child("settings/firstTo").Value.ToString(), out firstTo);
 

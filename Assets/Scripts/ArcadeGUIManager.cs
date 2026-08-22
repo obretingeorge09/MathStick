@@ -17,8 +17,19 @@ public class ArcadeGUIManager : MonoBehaviour
 
     // ── Mode Select UI ──────────────────────────────────────────────────
     public Text lbl_modeSelectTitle = null;
+    public Text lbl_roundsRule = null;
+
+    // Index 0..3 = Easy / Medium / Hard / Random, so the chosen one can be lit
+    public SegButtonSelect[] sel_mode = new SegButtonSelect[4];
+
+    // Index 0..2 = the entries of MatchLength.OPTIONS
+    public SegButtonSelect[] sel_rounds = new SegButtonSelect[3];
+
     GameMode selectedMode = GameMode.Easy;
-    int selectedFirstTo = 3;
+    int selectedRounds = MatchLength.DEFAULT_ROUNDS;
+
+    /// <summary>What the rest of the game speaks: rounds needed to win.</summary>
+    int selectedFirstTo => MatchLength.WinsFor(selectedRounds);
 
     // ── Lobby UI ────────────────────────────────────────────────────────
     public InputField inp_search = null;
@@ -80,6 +91,8 @@ public class ArcadeGUIManager : MonoBehaviour
                                        : (ArcadeMatchManager.Instance?.OpponentScore ?? 0);
     int      CurRound    => inBotMatch ? (BotMatchManager.Instance?.CurrentRound ?? 1)
                                        : (ArcadeMatchManager.Instance?.CurrentRound ?? 1);
+    int      CurFirstTo  => inBotMatch ? (BotMatchManager.Instance?.FirstTo ?? MatchLength.DefaultFirstTo)
+                                       : (ArcadeMatchManager.Instance?.FirstTo ?? MatchLength.DefaultFirstTo);
     string   CurOppName  => inBotMatch ? BotMatchManager.Instance?.OpponentName
                                        : ArcadeMatchManager.Instance?.OpponentName;
     GameMode CurMode     => inBotMatch ? (BotMatchManager.Instance?.MatchMode ?? GameMode.Easy)
@@ -156,7 +169,7 @@ public class ArcadeGUIManager : MonoBehaviour
         Show(pnl_arcadeModeSelect, true);
         inBotMatch = false;
         selectedMode = GameMode.Easy;
-        selectedFirstTo = 3;
+        selectedRounds = MatchLength.DEFAULT_ROUNDS;
         UpdateModeSelectUI();
     }
 
@@ -165,14 +178,38 @@ public class ArcadeGUIManager : MonoBehaviour
     public void OnSelectHard()    { selectedMode = GameMode.Hard;   UpdateModeSelectUI(); }
     public void OnSelectRandom()  { selectedMode = GameMode.Random; UpdateModeSelectUI(); }
 
-    public void OnSelectFirstTo3() { selectedFirstTo = 3; UpdateModeSelectUI(); }
-    public void OnSelectFirstTo5() { selectedFirstTo = 5; UpdateModeSelectUI(); }
-    public void OnSelectFirstTo7() { selectedFirstTo = 7; UpdateModeSelectUI(); }
+    // Wired to the three length keys. The names are positional, not values —
+    // the values live in MatchLength.OPTIONS so label and key cannot drift.
+    public void OnSelectRounds1() { SetRounds(0); }
+    public void OnSelectRounds2() { SetRounds(1); }
+    public void OnSelectRounds3() { SetRounds(2); }
+
+    void SetRounds(int index)
+    {
+        selectedRounds = MatchLength.OPTIONS[Mathf.Clamp(index, 0, MatchLength.OPTIONS.Length - 1)];
+        UpdateModeSelectUI();
+    }
 
     void UpdateModeSelectUI()
     {
         if (lbl_modeSelectTitle != null)
-            lbl_modeSelectTitle.text = selectedMode.ToString().ToUpper() + " - FIRST TO " + selectedFirstTo;
+            lbl_modeSelectTitle.text = selectedMode.ToString().ToUpper() + "  ·  " +
+                                       MatchLength.Label(selectedFirstTo);
+
+        if (lbl_roundsRule != null)
+            lbl_roundsRule.text = selectedRounds <= 1
+                ? "ONE ROUND  ·  WINNER TAKES THE MATCH"
+                : selectedRounds + " ROUNDS  ·  FIRST TO " + selectedFirstTo + " WINS";
+
+        // Without this the panel never showed which key was chosen, so the
+        // ones built dim looked broken however often they were tapped.
+        for (int i = 0; i < sel_mode.Length; i++)
+            if (sel_mode[i] != null) sel_mode[i].SetSelected(i == (int)selectedMode);
+
+        int keys = Mathf.Min(sel_rounds.Length, MatchLength.OPTIONS.Length);
+        for (int i = 0; i < keys; i++)
+            if (sel_rounds[i] != null)
+                sel_rounds[i].SetSelected(MatchLength.OPTIONS[i] == selectedRounds);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -494,7 +531,8 @@ public class ArcadeGUIManager : MonoBehaviour
         Show(pnl_invitePopup, true);
 
         if (lbl_inviteFrom != null) lbl_inviteFrom.text = invite.fromName;
-        if (lbl_inviteMode != null) lbl_inviteMode.text = invite.mode.ToString().ToUpper() + " - FIRST TO " + invite.firstTo;
+        if (lbl_inviteMode != null)
+            lbl_inviteMode.text = invite.mode.ToString().ToUpper() + "  ·  " + MatchLength.Label(invite.firstTo);
     }
 
     public void OnAcceptInvitePressed()
@@ -595,7 +633,12 @@ public class ArcadeGUIManager : MonoBehaviour
     {
         if (lbl_myScore != null) lbl_myScore.text = CurMyScore.ToString();
         if (lbl_oppScore != null) lbl_oppScore.text = CurOppScore.ToString();
-        if (lbl_roundInfo != null) lbl_roundInfo.text = "ROUND " + CurRound;
+        // "ROUND 2 OF 3" rather than "ROUND 2" — how long the match runs is the
+        // thing the length keys were failing to communicate.
+        if (lbl_roundInfo != null)
+            lbl_roundInfo.text = CurFirstTo <= 1
+                ? "ONE ROUND"
+                : "ROUND " + CurRound + " OF " + MatchLength.RoundsFor(CurFirstTo);
         if (lbl_oppName != null) lbl_oppName.text = CurOppName?.ToUpper() ?? "OPPONENT";
     }
 

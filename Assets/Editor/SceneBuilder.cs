@@ -173,11 +173,9 @@ public static class SceneBuilder
         Img(st, "TitleSeg", V2(.5f,1), V2(.5f,1), V2(0,-630), V2(160, 4), Hex("#F59E0B30")).raycastTarget = false;
 
         // ── Digit legend — the one thing a new player cannot guess ───────
-        // Nothing else on screen explains that a digit is made of seven sticks
-        // in a fixed housing. Showing all ten with their unlit segments still
-        // drawn teaches the rule, not just the shapes.
-        DigTxt(st, "lbl_legend_tag", "EVERY DIGIT IS SEVEN STICKS", V2(.5f,1), V2(.5f,1),
-            V2(0,-672), V2(900,24), 16, TEXT_MUTED).raycastTarget = false;
+        // Showing all ten digits with their unlit segments still drawn is the
+        // explanation; it needs no caption, and the one that used to sit here
+        // said every digit is seven sticks, which only 8 is.
 
         // 10 cells at a 76px pitch spans 754px, inside the 898px of usable
         // width the 978px canvas leaves after its 40px gutters.
@@ -807,7 +805,7 @@ public static class SceneBuilder
         RoundImg(amt, "ArcModeAccent", V2(.5f,1), V2(.5f,1), V2(0,-115), V2(120,3), ACCENT).raycastTarget = false;
 
         // Mode title (updates dynamically)
-        var lblArcModeTitle = Txt(amt, "lbl_arcmode_info", "EASY - FIRST TO 3",
+        var lblArcModeTitle = Txt(amt, "lbl_arcmode_info", "EASY  ·  " + MatchLength.Label(MatchLength.DefaultFirstTo),
             V2(.5f,1), V2(.5f,1), V2(0,-150), V2(500,30), 16, TEXT_MUTED,
             TextAnchor.MiddleCenter, FontStyle.Normal);
 
@@ -837,15 +835,35 @@ public static class SceneBuilder
         DigTxt(amt, "lbl_rand_info", "DIFFICULTY PICKED WHEN THE MATCH STARTS",
             V2(.5f,1), V2(.5f,1), V2(0,-712), V2(560,22), 14, TEXT_MUTED).raycastTarget = false;
 
-        // First-to buttons
-        DigTxt(amt, "lbl_firstto", "FIRST TO", V2(.5f,1), V2(.5f,1), V2(0,-790), V2(900,24), 16, TEXT_MUTED).raycastTarget = false;
+        // Match length, counted in rounds played rather than rounds won — "5"
+        // used to mean first to five wins, which is a nine-round match. The
+        // rule line underneath spells out how many of them decide it.
+        DigTxt(amt, "lbl_match_length", "MATCH LENGTH", V2(.5f,1), V2(.5f,1), V2(0,-782), V2(900,24), 16, TEXT_MUTED).raycastTarget = false;
 
-        var abFt3 = SegButton(amt, "btn_ft3", "3", V2(.5f,1), V2(.5f,1), V2(-140,-855),
+        var abRounds1 = SegButton(amt, "btn_rounds_1", MatchLength.OPTIONS[0].ToString(), V2(.5f,1), V2(.5f,1), V2(-140,-848),
             V2(110, 70), 28, arcCol);
-        var abFt5 = SegButton(amt, "btn_ft5", "5", V2(.5f,1), V2(.5f,1), V2(0,-855),
-            V2(110, 70), 28, arcDim);
-        var abFt7 = SegButton(amt, "btn_ft7", "7", V2(.5f,1), V2(.5f,1), V2(140,-855),
-            V2(110, 70), 28, arcDim);
+        var abRounds2 = SegButton(amt, "btn_rounds_3", MatchLength.OPTIONS[1].ToString(), V2(.5f,1), V2(.5f,1), V2(0,-848),
+            V2(110, 70), 28, arcCol);
+        var abRounds3 = SegButton(amt, "btn_rounds_5", MatchLength.OPTIONS[2].ToString(), V2(.5f,1), V2(.5f,1), V2(140,-848),
+            V2(110, 70), 28, arcCol);
+
+        var lblRoundsRule = DigTxt(amt, "lbl_rounds_rule",
+            MatchLength.DEFAULT_ROUNDS + " ROUNDS  ·  FIRST TO " + MatchLength.DefaultFirstTo + " WINS",
+            V2(.5f,1), V2(.5f,1), V2(0,-908), V2(620,22), 14, TEXT_MUTED);
+        lblRoundsRule.raycastTarget = false;
+
+        // A group only reads as a choice if the chosen key looks chosen. These
+        // were coloured once at build time and never touched again, so tapping
+        // any but the first appeared to do nothing.
+        var selRounds = new[] { Selectable(abRounds1, arcCol), Selectable(abRounds2, arcCol), Selectable(abRounds3, arcCol) };
+        var selModes  = new[] { Selectable(abEasy, mGreen2), Selectable(abMed, mYellow2),
+                                Selectable(abHard, mRed2),  Selectable(abRand, mCyan) };
+
+        // Bake the opening state — EASY, best of 3 — so the panel is already
+        // right on the first frame instead of at the first tap.
+        for (int i = 0; i < selRounds.Length; i++)
+            selRounds[i].SetSelected(MatchLength.OPTIONS[i] == MatchLength.DEFAULT_ROUNDS);
+        for (int i = 0; i < selModes.Length; i++)  selModes[i].SetSelected(i == 0);
 
         // Action buttons
         var abRandom = SegButton(amt, "btn_random_battle", "RANDOM BATTLE", V2(.5f,1), V2(.5f,1), V2(0,-975),
@@ -1145,7 +1163,7 @@ public static class SceneBuilder
             V2(.5f,1), V2(.5f,1), V2(0,-80), V2(400,40), 30, TEXT_PRIMARY,
             TextAnchor.MiddleCenter, FontStyle.Bold);
 
-        var lblInvMode = Txt(ict, "lbl_invite_mode", "EASY - FIRST TO 3",
+        var lblInvMode = Txt(ict, "lbl_invite_mode", "EASY  ·  " + MatchLength.Label(MatchLength.DefaultFirstTo),
             V2(.5f,1), V2(.5f,1), V2(0,-130), V2(400,30), 18, TEXT_MUTED,
             TextAnchor.MiddleCenter, FontStyle.Normal);
 
@@ -1271,6 +1289,9 @@ public static class SceneBuilder
         arcGui.pnl_arcadeResult = pnlArcResult;
         arcGui.pnl_invitePopup = pnlInvite;
         arcGui.lbl_modeSelectTitle = lblArcModeTitle;
+        arcGui.lbl_roundsRule = lblRoundsRule;
+        arcGui.sel_rounds = selRounds;
+        arcGui.sel_mode = selModes;
         arcGui.inp_search = searchInp;
         arcGui.userListContent = contentRt;
         arcGui.userRowPrefab = userRowGO;
@@ -1430,16 +1451,16 @@ public static class SceneBuilder
             abRand.transform.Find("btn_face").GetComponent<Button>().onClick,
             arcGui.OnSelectRandom);
 
-        // First-to
+        // Match length
         UnityEventTools.AddPersistentListener(
-            abFt3.transform.Find("btn_face").GetComponent<Button>().onClick,
-            arcGui.OnSelectFirstTo3);
+            abRounds1.transform.Find("btn_face").GetComponent<Button>().onClick,
+            arcGui.OnSelectRounds1);
         UnityEventTools.AddPersistentListener(
-            abFt5.transform.Find("btn_face").GetComponent<Button>().onClick,
-            arcGui.OnSelectFirstTo5);
+            abRounds2.transform.Find("btn_face").GetComponent<Button>().onClick,
+            arcGui.OnSelectRounds2);
         UnityEventTools.AddPersistentListener(
-            abFt7.transform.Find("btn_face").GetComponent<Button>().onClick,
-            arcGui.OnSelectFirstTo7);
+            abRounds3.transform.Find("btn_face").GetComponent<Button>().onClick,
+            arcGui.OnSelectRounds3);
 
         // Actions
         UnityEventTools.AddPersistentListener(
@@ -1619,6 +1640,24 @@ public static class SceneBuilder
         lbl.resizeTextMaxSize = Mathf.Max(fontSize, 8);
 
         return container;
+    }
+
+    /// <summary>
+    /// Lets a SegButton switch between a chosen and an unchosen look. Finds the
+    /// pieces SegButton built rather than taking them as arguments, so the two
+    /// cannot fall out of step.
+    /// </summary>
+    static SegButtonSelect Selectable(GameObject btn, Color accent)
+    {
+        var face = btn.transform.Find("btn_face");
+
+        var sel = btn.AddComponent<SegButtonSelect>();
+        sel.accent = accent;
+        sel.rim   = btn.transform.Find("btn_rim").GetComponent<Image>();
+        sel.face  = face.GetComponent<Image>();
+        sel.gloss = face.Find("btn_gloss").GetComponent<Image>();
+        sel.label = face.Find("lbl_btn").GetComponent<Text>();
+        return sel;
     }
 
     /// <summary>Sliced rounded image stretched to its parent, offset by pos.</summary>

@@ -247,7 +247,7 @@ public class LobbyManager : MonoBehaviour
                 if (child.Key == myUid) continue;
 
                 string oppMode = child.Child("mode").Value?.ToString() ?? "";
-                int oppFirstTo = 3;
+                int oppFirstTo = MatchLength.DefaultFirstTo;
                 if (child.Child("firstTo").Value != null)
                     int.TryParse(child.Child("firstTo").Value.ToString(), out oppFirstTo);
 
@@ -434,7 +434,7 @@ public class LobbyManager : MonoBehaviour
             GameMode mode = GameMode.Easy;
             Enum.TryParse(e.Snapshot.Child("mode").Value?.ToString() ?? "Easy", out mode);
 
-            int firstTo = 3;
+            int firstTo = MatchLength.DefaultFirstTo;
             if (e.Snapshot.Child("firstTo").Value != null)
                 int.TryParse(e.Snapshot.Child("firstTo").Value.ToString(), out firstTo);
 
